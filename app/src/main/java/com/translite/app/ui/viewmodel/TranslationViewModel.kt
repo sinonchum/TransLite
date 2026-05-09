@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.translite.app.data.db.entity.TranslationEntity
 import com.translite.app.data.repository.TranslationRepository
+import com.translite.app.domain.engine.OnlineTranslator
 import com.translite.app.domain.model.Language
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,7 +20,8 @@ data class TranslationUiState(
 )
 
 class TranslationViewModel(
-    private val repository: TranslationRepository
+    private val repository: TranslationRepository,
+    private val engine: OnlineTranslator? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TranslationUiState())

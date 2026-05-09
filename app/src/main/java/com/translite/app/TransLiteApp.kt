@@ -3,21 +3,21 @@ package com.translite.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import com.translite.app.domain.engine.GemmaTranslator
+import com.translite.app.domain.engine.OnlineTranslator
 
 class TransLiteApp : Application() {
 
-    lateinit var gemmaTranslator: GemmaTranslator
+    lateinit var translationEngine: OnlineTranslator
         private set
 
     override fun onCreate() {
         super.onCreate()
-        gemmaTranslator = GemmaTranslator(this)
+        translationEngine = OnlineTranslator()
         createNotificationChannels()
     }
 
     override fun onTerminate() {
-        gemmaTranslator.close()
+        translationEngine.close()
         super.onTerminate()
     }
 
@@ -40,17 +40,8 @@ class TransLiteApp : Application() {
             description = "屏幕文字识别通知"
         }
 
-        val modelChannel = NotificationChannel(
-            CHANNEL_MODEL,
-            "模型加载",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "翻译模型加载进度"
-        }
-
         manager.createNotificationChannel(floatingChannel)
         manager.createNotificationChannel(ocrChannel)
-        manager.createNotificationChannel(modelChannel)
     }
 
     companion object {

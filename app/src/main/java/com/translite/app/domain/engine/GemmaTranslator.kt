@@ -7,6 +7,8 @@ import com.translite.app.domain.model.Language
 import com.translite.app.domain.model.TranslationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -17,7 +19,7 @@ import java.net.URL
 /**
  * Translation engine using TranslateGemma via MediaPipe LLM Inference.
  *
- * Thread-safe singleton pattern: use (application as TransLiteApp).gemmaTranslator.
+ * Auto-downloads model from Chinese mirror on first translate attempt.
  */
 class GemmaTranslator(
     private val context: Context
@@ -26,6 +28,18 @@ class GemmaTranslator(
     @Volatile private var llmInference: LlmInference? = null
     @Volatile private var modelReady = false
     private val initLock = Any()
+
+    // Observable download state for UI
+    private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val downloadState: StateFlow<DownloadState> = _downloadState
+
+    sealed class DownloadState {
+        data object Idle : DownloadState()
+        data object Downloading : DownloadState()
+        data class Progress(val percent: Int) : DownloadState()
+        data object Ready : DownloadState()
+        data class Error(val message: String) : DownloadState()
+    }
 
     private val modelDir: File by lazy {
         File(context.filesDir, "models").also { it.mkdirs() }
@@ -48,6 +62,7 @@ class GemmaTranslator(
             synchronized(initLock) {
                 if (!modelReady) initLlmInference()
             }
+            _downloadState.value = DownloadState.Ready
             emit(1f)
             return@flow
         }
@@ -58,11 +73,12 @@ class GemmaTranslator(
             synchronized(initLock) {
                 if (!modelReady) initLlmInference()
             }
+            _downloadState.value = DownloadState.Ready
             emit(1f)
             return@flow
         }
 
-        // Try Chinese mirror first, then HuggingFace
+        // Download from mirrors
         val urls = listOf(
             "https://hf-mirror.com/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf",
             "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf"
@@ -70,12 +86,16 @@ class GemmaTranslator(
 
         for (urlStr in urls) {
             try {
-                Log.i(TAG, "Trying download from: $urlStr")
+                Log.i(TAG, "Downloading from: $urlStr")
+                _downloadState.value = DownloadState.Downloading
                 emit(0f)
-                downloadFromUrl(urlStr)
+                withContext(Dispatchers.IO) {
+                    downloadFromUrl(urlStr)
+                }
                 synchronized(initLock) {
                     if (!modelReady) initLlmInference()
                 }
+                _downloadState.value = DownloadState.Ready
                 emit(1f)
                 return@flow
             } catch (e: Exception) {
@@ -84,7 +104,9 @@ class GemmaTranslator(
             }
         }
 
-        throw Exception("翻译模型下载失败。请手动将 $MODEL_FILENAME 放入内部存储 models/ 目录。")
+        val errorMsg = "翻译模型下载失败。请检查网络连接后重试。"
+        _downloadState.value = DownloadState.Error(errorMsg)
+        throw Exception(errorMsg)
     }
 
     override suspend fun deleteLanguageModel(lang: Language) {
@@ -94,6 +116,7 @@ class GemmaTranslator(
             modelReady = false
         }
         modelFile.delete()
+        _downloadState.value = DownloadState.Idle
     }
 
     override suspend fun translate(
@@ -105,12 +128,14 @@ class GemmaTranslator(
             try {
                 ensureModelReady()
 
-                val inference = llmInference
-                if (!modelReady || inference == null) {
+                if (!modelReady || llmInference == null) {
                     return@withContext Result.failure(
-                        Exception("翻译模型未加载。请先在设置中加载模型。")
+                        Exception("翻译模型未加载。请先在设置中下载模型。")
                     )
                 }
+
+                val inference = llmInference
+                    ?: return@withContext Result.failure(Exception("Model not initialized"))
 
                 val prompt = buildPrompt(text, sourceLang, targetLang)
                 val response = inference.generateResponse(prompt)
@@ -129,6 +154,29 @@ class GemmaTranslator(
                 Result.failure(e)
             }
         }
+    }
+
+    /**
+     * Auto-download model if not present. Called from ViewModel before translation.
+     */
+    suspend fun ensureModelAvailable(): Boolean {
+        if (modelReady && modelFile.exists()) return true
+
+        // Try local first
+        synchronized(initLock) {
+            if (modelFile.exists()) {
+                initLlmInference()
+                return true
+            }
+            val copied = copyModelFromAssets()
+            if (copied && modelFile.exists()) {
+                initLlmInference()
+                return true
+            }
+        }
+
+        // Need to download — trigger download flow
+        return false
     }
 
     private fun ensureModelReady() {
@@ -154,6 +202,7 @@ class GemmaTranslator(
             val assetManager = context.assets
             val modelsDir = assetManager.list("models") ?: emptyArray()
             if (modelsDir.any { it == MODEL_FILENAME }) {
+                _downloadState.value = DownloadState.Downloading
                 assetManager.open("models/$MODEL_FILENAME").use { input ->
                     FileOutputStream(modelFile).use { output ->
                         input.copyTo(output)
@@ -196,7 +245,7 @@ class GemmaTranslator(
                 }
             }
 
-            Log.i(TAG, "Downloaded ${downloaded / 1024 / 1024}MB from $urlStr")
+            Log.i(TAG, "Downloaded ${downloaded / 1024 / 1024}MB")
         } finally {
             connection?.disconnect()
         }

@@ -33,7 +33,7 @@ class FloatingBallService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val db = AppDatabase.getInstance(this)
-        val engine = (application as TransLiteApp).gemmaTranslator
+        val engine = (application as TransLiteApp).translationEngine
         repository = TranslationRepository(engine, db.translationDao())
     }
 

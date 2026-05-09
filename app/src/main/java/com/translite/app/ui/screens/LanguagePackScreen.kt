@@ -8,13 +8,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.domain.engine.TranslationEngine
 import com.translite.app.domain.model.Language
 import kotlinx.coroutines.launch
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,195 +20,178 @@ fun LanguagePackScreen(
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    var isModelReady by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(true) }
-    var isDownloading by remember { mutableStateOf(false) }
+    var languageStatus by remember { mutableStateOf<Map<Language, Boolean>>(emptyMap()) }
+    var downloading by remember { mutableStateOf<Language?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf<Language?>(null) }
 
-    // Check model status on load
+    // Check language status on load
     LaunchedEffect(Unit) {
-        isLoading = true
-        isModelReady = engine.isLanguageDownloaded(Language.ENGLISH)
-        isLoading = false
+        val status = mutableMapOf<Language, Boolean>()
+        Language.entries.filter { it != Language.AUTO }.forEach { lang ->
+            status[lang] = engine.isLanguageDownloaded(lang)
+        }
+        languageStatus = status
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Model status card
-        Card(
+        // Header
+        Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isModelReady)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                else
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-            )
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (isModelReady) Icons.Default.CheckCircle else Icons.Default.Error,
-                        contentDescription = null,
-                        tint = if (isModelReady) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "翻译模型",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Text(
-                            text = when {
-                                isLoading -> "检查中..."
-                                isModelReady -> "TranslateGemma 4B · 已就绪"
-                                isDownloading -> "下载中... ${(downloadProgress * 100).toInt()}%"
-                                else -> "未加载"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (isDownloading) {
-                    Spacer(Modifier.height(12.dp))
-                    LinearProgressIndicator(
-                        progress = { downloadProgress },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    text = "模型文件: ${GemmaTranslator.MODEL_FILENAME}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "请将模型文件放入 APK 的 assets/ 目录后重新编译",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-
-                errorMessage?.let { msg ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Row {
-                    if (!isModelReady && !isDownloading) {
-                        FilledTonalButton(
-                            onClick = {
-                                isDownloading = true
-                                errorMessage = null
-                                scope.launch {
-                                    try {
-                                        engine.downloadLanguage(Language.ENGLISH).collect { p ->
-                                            downloadProgress = p
-                                        }
-                                        isModelReady = true
-                                    } catch (e: Exception) {
-                                        errorMessage = e.message ?: "加载失败"
-                                    }
-                                    isDownloading = false
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("加载模型")
-                        }
-                    }
-
-                    if (isModelReady) {
-                        FilledTonalButton(
-                            onClick = { showDeleteDialog = true },
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("删除模型")
-                        }
-                    }
-                }
-            }
+            Text(
+                text = "语言包管理",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Text(
+                text = "${languageStatus.values.count { it }}/${languageStatus.size} 已下载",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
-        // Supported languages info
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
+        Text(
+            text = "首次翻译某语言时会自动下载语言包（约30-50MB）。",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "支持的语言",
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Spacer(Modifier.height(8.dp))
-                val supportedLanguages = listOf(
-                    "🇨🇳 中文" to "Chinese",
-                    "🇺🇸 English" to "English",
-                    "🇫🇷 Français" to "French",
-                    "🇪🇸 Español" to "Spanish",
-                    "🇩🇪 Deutsch" to "German",
-                    "🇯🇵 日本語" to "Japanese",
-                    "🇰🇷 한국어" to "Korean",
-                    "🇷🇺 Русский" to "Russian",
-                    "🇧🇷 Português" to "Portuguese",
-                    "🇸🇦 العربية" to "Arabic"
-                )
-                supportedLanguages.chunked(2).forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        row.forEach { (display, _) ->
-                            Text(
-                                text = display,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f)
-                            )
+            val languages = Language.entries.filter { it != Language.AUTO }.toList()
+            items(languages.size) { index ->
+                val lang = languages[index]
+                val isDownloaded = languageStatus[lang] ?: false
+                val isDownloading = downloading == lang
+
+                LanguagePackItem(
+                    language = lang,
+                    isDownloaded = isDownloaded,
+                    isDownloading = isDownloading,
+                    progress = if (isDownloading) downloadProgress else if (isDownloaded) 1f else 0f,
+                    onDownload = {
+                        downloading = lang
+                        downloadProgress = 0f
+                        scope.launch {
+                            try {
+                                engine.downloadLanguage(lang).collect { p ->
+                                    downloadProgress = p
+                                }
+                                languageStatus = languageStatus.toMutableMap().apply {
+                                    put(lang, true)
+                                }
+                            } catch (_: Exception) {
+                                languageStatus = languageStatus.toMutableMap().apply {
+                                    put(lang, false)
+                                }
+                            }
+                            downloading = null
                         }
+                    },
+                    onDelete = {
+                        showDeleteDialog = lang
                     }
-                }
+                )
             }
         }
     }
 
-    // Delete confirmation dialog
-    if (showDeleteDialog) {
+    showDeleteDialog?.let { lang ->
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("删除翻译模型") },
-            text = { Text("确定要删除翻译模型吗？删除后需要重新将模型文件放入 assets 目录并重新编译。") },
+            onDismissRequest = { showDeleteDialog = null },
+            title = { Text("删除语言包") },
+            text = { Text("确定要删除 ${lang.displayName} 语言包吗？删除后需要重新下载才能离线翻译。") },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        engine.deleteLanguageModel(Language.ENGLISH)
-                        isModelReady = false
+                        engine.deleteLanguageModel(lang)
+                        languageStatus = languageStatus.toMutableMap().apply {
+                            put(lang, false)
+                        }
                     }
-                    showDeleteDialog = false
+                    showDeleteDialog = null
                 }) { Text("删除", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+                TextButton(onClick = { showDeleteDialog = null }) { Text("取消") }
             }
         )
+    }
+}
+
+@Composable
+fun LanguagePackItem(
+    language: Language,
+    isDownloaded: Boolean,
+    isDownloading: Boolean,
+    progress: Float,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDownloaded)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Language info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "${language.displayName} (${language.displayNameEn})",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = when {
+                        isDownloaded -> "已下载 ✓"
+                        isDownloading -> "下载中... ${(progress * 100).toInt()}%"
+                        else -> "未下载"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when {
+                        isDownloaded -> MaterialTheme.colorScheme.primary
+                        isDownloading -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.outline
+                    }
+                )
+            }
+
+            // Action
+            if (isDownloading) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(32.dp),
+                    strokeWidth = 3.dp
+                )
+            } else if (isDownloaded) {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = "删除",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            } else {
+                FilledTonalButton(onClick = onDownload) {
+                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("下载")
+                }
+            }
+        }
     }
 }

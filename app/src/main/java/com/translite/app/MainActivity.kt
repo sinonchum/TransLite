@@ -19,7 +19,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
 import com.translite.app.service.FloatingBallService
@@ -27,11 +26,6 @@ import com.translite.app.service.ScreenCaptureService
 import com.translite.app.ui.screens.*
 import com.translite.app.ui.theme.TransLiteTheme
 import com.translite.app.ui.viewmodel.TranslationViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
 
@@ -72,14 +66,11 @@ class MainActivity : ComponentActivity() {
         isFloatingActive = prefs.getBoolean("floating_active", false)
 
         val db = AppDatabase.getInstance(this)
-        val engine = (application as TransLiteApp).gemmaTranslator
+        val engine = (application as TransLiteApp).translationEngine
         val repository = TranslationRepository(engine, db.translationDao())
-        viewModel = TranslationViewModel(repository)
+        viewModel = TranslationViewModel(repository, engine)
 
         requestPermissions()
-
-        // Copy model from assets to internal storage on first launch
-        copyModelToStorage(engine)
 
         setContent {
             TransLiteTheme {
@@ -109,32 +100,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun copyModelToStorage(engine: com.translite.app.domain.engine.GemmaTranslator) {
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                try {
-                    val modelDir = File(filesDir, "models").also { it.mkdirs() }
-                    val modelFile = File(modelDir, com.translite.app.domain.engine.GemmaTranslator.MODEL_FILENAME)
-                    if (modelFile.exists()) return@withContext
-
-                    val assetManager = assets
-                    val modelsDir = assetManager.list("models") ?: emptyArray()
-                    if (modelsDir.any { it == com.translite.app.domain.engine.GemmaTranslator.MODEL_FILENAME }) {
-                        Toast.makeText(this@MainActivity, "正在复制翻译模型...", Toast.LENGTH_SHORT).show()
-                        assetManager.open("models/${com.translite.app.domain.engine.GemmaTranslator.MODEL_FILENAME}").use { input ->
-                            FileOutputStream(modelFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        Toast.makeText(this@MainActivity, "模型复制完成", Toast.LENGTH_SHORT).show()
-                    }
-                } catch (e: Exception) {
-                    // Model not in assets — will need to download
-                }
-            }
-        }
-    }
-
     private fun requestPermissions() {
         val perms = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -156,7 +121,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp(
     viewModel: TranslationViewModel,
-    engine: com.translite.app.domain.engine.GemmaTranslator,
+    engine: com.translite.app.domain.engine.OnlineTranslator,
     isFloatingActive: Boolean,
     onToggleFloating: (Boolean) -> Unit,
     onScreenCapture: () -> Unit

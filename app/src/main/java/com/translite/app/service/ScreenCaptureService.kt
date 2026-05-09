@@ -45,7 +45,7 @@ class ScreenCaptureService : Service() {
         super.onCreate()
         ocrEngine = MlKitOcr()
         val db = AppDatabase.getInstance(this)
-        val engine = (application as TransLiteApp).gemmaTranslator
+        val engine = (application as TransLiteApp).translationEngine
         repository = TranslationRepository(engine, db.translationDao())
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
     }

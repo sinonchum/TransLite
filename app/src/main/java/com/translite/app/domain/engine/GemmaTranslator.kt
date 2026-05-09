@@ -59,7 +59,7 @@ class GemmaTranslator(
     }
 
     private val primaryModelFile: File by lazy {
-        File(modelDir, "gemma-4-E2B-it-web.task")
+        File(modelDir, "translategemma-4b-it-int8-web.task")
     }
 
     // Fallback: gemma3-1b-it (smaller, q4 quantized)

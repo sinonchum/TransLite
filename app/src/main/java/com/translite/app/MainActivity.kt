@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.platform.LocalContext
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
 import com.translite.app.service.FloatingBallService
@@ -66,9 +67,9 @@ class MainActivity : ComponentActivity() {
         isFloatingActive = prefs.getBoolean("floating_active", false)
 
         val db = AppDatabase.getInstance(this)
-        val engine = (application as TransLiteApp).translationEngine
-        val repository = TranslationRepository(engine, db.translationDao())
-        viewModel = TranslationViewModel(repository, engine)
+        val app = application as TransLiteApp
+        val repository = TranslationRepository(app.onlineEngine, db.translationDao())
+        viewModel = TranslationViewModel(repository, app.onlineEngine, app.offlineEngine)
 
         requestPermissions()
 
@@ -76,7 +77,6 @@ class MainActivity : ComponentActivity() {
             TransLiteTheme {
                 MainApp(
                     viewModel = viewModel,
-                    engine = engine,
                     isFloatingActive = isFloatingActive,
                     onToggleFloating = { toggle ->
                         isFloatingActive = toggle
@@ -121,7 +121,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp(
     viewModel: TranslationViewModel,
-    engine: com.translite.app.domain.engine.OnlineTranslator,
     isFloatingActive: Boolean,
     onToggleFloating: (Boolean) -> Unit,
     onScreenCapture: () -> Unit
@@ -130,6 +129,19 @@ fun MainApp(
     val history by viewModel.history.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     var showLanguagePacks by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    if (showCamera) {
+        CameraScreen(
+            onBack = { showCamera = false },
+            onTextRecognized = { text ->
+                showCamera = false
+                viewModel.updateInput(text)
+                viewModel.translate()
+            }
+        )
+        return
+    }
 
     if (showLanguagePacks) {
         Scaffold(
@@ -144,8 +156,9 @@ fun MainApp(
                 )
             }
         ) { padding ->
+            val app = LocalContext.current.applicationContext as TransLiteApp
             LanguagePackScreen(
-                engine = engine,
+                engine = app.onlineEngine,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -160,8 +173,20 @@ fun MainApp(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 ),
                 actions = {
+                    // Camera button for photo OCR
+                    IconButton(onClick = { showCamera = true }) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = "拍照翻译")
+                    }
+                    // Screen capture button
                     IconButton(onClick = onScreenCapture) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "屏幕翻译")
+                        Icon(Icons.Default.ScreenShare, contentDescription = "屏幕翻译")
+                    }
+                    // Offline mode toggle
+                    IconButton(onClick = { viewModel.toggleOfflineMode() }) {
+                        Icon(
+                            if (uiState.isOfflineMode) Icons.Default.CloudOff else Icons.Default.Cloud,
+                            contentDescription = if (uiState.isOfflineMode) "切换在线" else "切换离线"
+                        )
                     }
                 }
             )
@@ -221,6 +246,11 @@ fun MainApp(
                 isFloatingActive = isFloatingActive,
                 onToggleFloating = onToggleFloating,
                 onLanguagePacks = { showLanguagePacks = true },
+                isOfflineMode = uiState.isOfflineMode,
+                onToggleOffline = { viewModel.toggleOfflineMode() },
+                isModelDownloading = uiState.isModelDownloading,
+                downloadProgress = uiState.downloadProgress,
+                onDownloadModel = { viewModel.downloadOfflineModel() },
                 modifier = Modifier.padding(padding)
             )
         }

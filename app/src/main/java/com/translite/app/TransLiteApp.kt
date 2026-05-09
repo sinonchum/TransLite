@@ -3,21 +3,44 @@ package com.translite.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.domain.engine.OnlineTranslator
 
 class TransLiteApp : Application() {
 
-    lateinit var translationEngine: OnlineTranslator
+    lateinit var onlineEngine: OnlineTranslator
         private set
+
+    lateinit var offlineEngine: GemmaTranslator
+        private set
+
+    var useOffline: Boolean = false
+        set(value) {
+            field = value
+            getSharedPreferences("translite_prefs", MODE_PRIVATE)
+                .edit()
+                .putBoolean("use_offline", value)
+                .apply()
+        }
+
+    val activeEngine: Any
+        get() = if (useOffline) offlineEngine else onlineEngine
 
     override fun onCreate() {
         super.onCreate()
-        translationEngine = OnlineTranslator()
+        onlineEngine = OnlineTranslator()
+        offlineEngine = GemmaTranslator(this)
+
+        // Restore offline preference
+        useOffline = getSharedPreferences("translite_prefs", MODE_PRIVATE)
+            .getBoolean("use_offline", false)
+
         createNotificationChannels()
     }
 
     override fun onTerminate() {
-        translationEngine.close()
+        onlineEngine.close()
+        offlineEngine.close()
         super.onTerminate()
     }
 

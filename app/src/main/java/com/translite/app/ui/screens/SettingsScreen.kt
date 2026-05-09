@@ -14,8 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.translite.app.domain.model.Language
-import com.translite.app.service.FloatingBallService
 
 data class SettingsItem(
     val title: String,
@@ -29,36 +27,14 @@ fun SettingsScreen(
     isFloatingActive: Boolean,
     onToggleFloating: (Boolean) -> Unit,
     onLanguagePacks: () -> Unit = {},
+    isOfflineMode: Boolean = false,
+    onToggleOffline: () -> Unit = {},
+    isModelDownloading: Boolean = false,
+    downloadProgress: Int = 0,
+    onDownloadModel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-
-    val settingsItems = listOf(
-        SettingsItem(
-            title = "悬浮球翻译",
-            subtitle = if (isFloatingActive) "已开启" else "关闭",
-            icon = Icons.Default.OpenWith
-        ) { onToggleFloating(!isFloatingActive) },
-        SettingsItem(
-            title = "悬浮窗权限",
-            subtitle = "管理应用悬浮窗权限",
-            icon = Icons.Default.PictureInPicture
-        ) {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:${context.packageName}"))
-            context.startActivity(intent)
-        },
-        SettingsItem(
-            title = "语言包管理",
-            subtitle = "下载和管理离线翻译语言包",
-            icon = Icons.Default.Language
-        ) { onLanguagePacks() },
-        SettingsItem(
-            title = "关于",
-            subtitle = "TransLite v1.2.0",
-            icon = Icons.Default.Info
-        ) { /* no-op */ }
-    )
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -73,21 +49,157 @@ fun SettingsScreen(
             )
         }
 
-        items(settingsItems) { item ->
+        // Offline Model Section
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "离线翻译模型",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Model info
+                    Text(
+                        text = "TranslateGemma 4B (官方翻译模型，约3.9GB)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        text = "或 Gemma3 1B (轻量模型，约555MB)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Offline mode toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("使用离线模型", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = if (isOfflineMode) "当前使用离线翻译" else "当前使用在线翻译",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                        Switch(
+                            checked = isOfflineMode,
+                            onCheckedChange = { onToggleOffline() }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Download button
+                    if (isModelDownloading) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            LinearProgressIndicator(
+                                progress = { downloadProgress / 100f },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = "下载中... $downloadProgress%",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = onDownloadModel,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("下载离线模型")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "注意：需先在 HuggingFace 接受 Gemma 许可协议",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        // Other settings
+        item {
             Surface(
-                onClick = item.onClick,
+                onClick = { onToggleFloating(!isFloatingActive) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 ListItem(
-                    headlineContent = { Text(item.title) },
-                    supportingContent = { Text(item.subtitle) },
+                    headlineContent = { Text("悬浮球翻译") },
+                    supportingContent = { Text(if (isFloatingActive) "已开启" else "关闭") },
                     leadingContent = {
-                        Icon(item.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.OpenWith, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    },
+                    trailingContent = {
+                        Switch(checked = isFloatingActive, onCheckedChange = null)
                     }
                 )
             }
-
             HorizontalDivider()
+        }
+
+        item {
+            Surface(
+                onClick = {
+                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${context.packageName}"))
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ListItem(
+                    headlineContent = { Text("悬浮窗权限") },
+                    supportingContent = { Text("管理应用悬浮窗权限") },
+                    leadingContent = {
+                        Icon(Icons.Default.PictureInPicture, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                )
+            }
+            HorizontalDivider()
+        }
+
+        item {
+            Surface(
+                onClick = onLanguagePacks,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                ListItem(
+                    headlineContent = { Text("语言包管理") },
+                    supportingContent = { Text("下载和管理离线翻译语言包") },
+                    leadingContent = {
+                        Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                )
+            }
+            HorizontalDivider()
+        }
+
+        item {
+            ListItem(
+                headlineContent = { Text("关于") },
+                supportingContent = { Text("TransLite v1.3.0 — 离线翻译助手") },
+                leadingContent = {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            )
         }
     }
 }

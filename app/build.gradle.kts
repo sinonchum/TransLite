@@ -12,8 +12,8 @@ android {
         applicationId = "com.translite.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -96,6 +96,13 @@ dependencies {
 
     // MediaPipe Model Loader
     implementation("com.google.mediapipe:tasks-text:0.10.18")
+
+    // CameraX
+    val cameraxVersion = "1.3.1"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
 
     // ML Kit Text Recognition
     implementation("com.google.mlkit:text-recognition:16.0.0")

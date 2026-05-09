@@ -1,11 +1,13 @@
 package com.translite.app.domain.engine
 
+import android.util.Log
 import com.translite.app.domain.model.Language
 import com.translite.app.domain.model.TranslationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -24,7 +26,7 @@ class OnlineTranslator : TranslationEngine {
     override suspend fun isLanguageDownloaded(lang: Language): Boolean = true
 
     override suspend fun downloadLanguage(lang: Language): Flow<Float> = flow {
-        emit(1f) // No download needed for online API
+        emit(1f)
     }
 
     override suspend fun deleteLanguageModel(lang: Language) { }
@@ -47,13 +49,14 @@ class OnlineTranslator : TranslationEngine {
                 conn.readTimeout = 15_000
 
                 if (conn.responseCode == 200) {
-                    val body = conn.inputStream.bufferedReader().readText()
-                    // Parse JSON response
-                    val translated = body
-                        .substringAfter("\"translatedText\":\"")
-                        .substringBefore("\"")
-                        .replace("\\u0027", "'")
-                        .replace("\\\"", "\"")
+                    val body = conn.inputStream.bufferedReader(Charsets.UTF_8).readText()
+
+                    // Use proper JSON parsing instead of naive substring matching
+                    val json = JSONObject(body)
+                    val responseData = json.optJSONObject("responseData")
+                    val translated = responseData?.optString("translatedText", "") ?: ""
+
+                    Log.i(TAG, "Translation result: $translated")
 
                     if (translated.isNotBlank() && translated != text) {
                         Result.success(
@@ -72,6 +75,7 @@ class OnlineTranslator : TranslationEngine {
                     Result.failure(Exception("API错误: ${conn.responseCode}"))
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Translation failed", e)
                 Result.failure(e)
             }
         }
@@ -80,6 +84,7 @@ class OnlineTranslator : TranslationEngine {
     fun close() { }
 
     companion object {
+        private const val TAG = "OnlineTranslator"
         const val MODEL_FILENAME = "online_api"
     }
 }

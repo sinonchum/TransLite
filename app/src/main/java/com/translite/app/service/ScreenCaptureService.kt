@@ -25,7 +25,7 @@ import com.translite.app.R
 import com.translite.app.TransLiteApp
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
-import com.translite.app.domain.engine.MlKitTranslator
+import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.domain.model.Language
 import com.translite.app.domain.ocr.MlKitOcr
 import kotlinx.coroutines.*
@@ -47,7 +47,7 @@ class ScreenCaptureService : Service() {
         super.onCreate()
         ocrEngine = MlKitOcr()
         val db = AppDatabase.getInstance(this)
-        val engine = MlKitTranslator()
+        val engine = GemmaTranslator(this@ScreenCaptureService)
         repository = TranslationRepository(engine, db.translationDao())
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
     }

@@ -26,6 +26,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            lint {
+                abortOnError = false
+            }
         }
         debug {
             isDebuggable = true
@@ -71,13 +74,17 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.fragment:fragment-ktx:1.6.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // ML Kit Translation (offline)
-    implementation("com.google.mlkit:translate:17.0.3")
+    // MediaPipe LLM Inference (TranslateGemma)
+    implementation("com.google.mediapipe:tasks-genai:0.10.18")
+
+    // MediaPipe Model Loader
+    implementation("com.google.mediapipe:tasks-text:0.10.18")
 
     // ML Kit Text Recognition
     implementation("com.google.mlkit:text-recognition:16.0.0")

@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
-import com.translite.app.domain.engine.MlKitTranslator
+import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.service.FloatingBallService
 import com.translite.app.service.ScreenCaptureService
 import com.translite.app.ui.screens.*
@@ -31,7 +31,7 @@ import com.translite.app.ui.viewmodel.TranslationViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: TranslationViewModel
-    private lateinit var engine: MlKitTranslator
+    private lateinit var engine: GemmaTranslator
     private var isFloatingActive = false
 
     private val permissionLauncher = registerForActivityResult(
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val db = AppDatabase.getInstance(this)
-        engine = MlKitTranslator()
+        engine = GemmaTranslator(this)
         val repository = TranslationRepository(engine, db.translationDao())
         viewModel = TranslationViewModel(repository)
 
@@ -111,7 +111,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp(
     viewModel: TranslationViewModel,
-    engine: MlKitTranslator,
+    engine: GemmaTranslator,
     isFloatingActive: Boolean,
     onToggleFloating: (Boolean) -> Unit,
     onScreenCapture: () -> Unit

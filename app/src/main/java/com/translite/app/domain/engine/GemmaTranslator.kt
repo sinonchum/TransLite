@@ -1,6 +1,7 @@
 package com.translite.app.domain.engine
 
 import android.content.Context
+import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.translite.app.domain.model.Language
 import com.translite.app.domain.model.TranslationResult
@@ -9,14 +10,18 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.URL
+import java.io.FileOutputStream
 
 /**
  * Translation engine using TranslateGemma via MediaPipe LLM Inference.
- * Downloads the GGUF model on first use, then translates on-device.
  *
- * Model: google/translategemma-4b-it (GGUF quantized)
- * Fallback: LibreTranslate API when model not ready
+ * Model loading priority:
+ * 1. Internal storage (filesDir/models/) — previously copied or downloaded
+ * 2. Assets directory — bundled model in APK
+ * 3. Error if neither found
+ *
+ * To bundle the model: place translategemma-4b-it-q4_k_m.gguf
+ * in app/src/main/assets/ before building.
  */
 class GemmaTranslator(
     private val context: Context
@@ -28,54 +33,38 @@ class GemmaTranslator(
         File(context.filesDir, "models").also { it.mkdirs() }
     }
     private val modelFile: File by lazy {
-        File(modelDir, "translategemma-4b-it-q4_k_m.gguf")
+        File(modelDir, MODEL_FILENAME)
     }
+    private val assetsModelPath = "models/$MODEL_FILENAME"
 
     override fun observeDownloadingLanguages(): Flow<Set<String>> = flow {
         emit(emptySet())
     }
 
     override suspend fun isLanguageDownloaded(lang: Language): Boolean {
-        return modelReady && modelFile.exists()
+        ensureModelReady()
+        return modelReady
     }
 
     override suspend fun downloadLanguage(lang: Language): Flow<Float> = flow {
+        // Model should be pre-bundled in assets
+        // Try to copy from assets to internal storage
         if (modelFile.exists()) {
             modelReady = true
             emit(1f)
             return@flow
         }
 
-        // Download GGUF model from HuggingFace
-        emit(0f)
-        try {
-            val url = URL("https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf")
-            val connection = url.openConnection()
-            val totalSize = connection.contentLength
-            var downloaded = 0L
-
-            connection.inputStream.use { input ->
-                modelFile.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        downloaded += bytesRead
-                        if (totalSize > 0) {
-                            emit(downloaded.toFloat() / totalSize)
-                        }
-                    }
-                }
-            }
-
-            // Initialize MediaPipe LLM
-            initLlmInference()
+        // Try to copy from assets
+        val copied = copyModelFromAssets()
+        if (copied) {
             modelReady = true
             emit(1f)
-        } catch (e: Exception) {
-            modelFile.delete()
-            throw e
+            return@flow
         }
+
+        // Model not found anywhere
+        throw Exception("翻译模型未找到。请将 $MODEL_FILENAME 放入 APK 的 assets/models/ 目录后重新编译。")
     }
 
     override suspend fun deleteLanguageModel(lang: Language) {
@@ -92,8 +81,12 @@ class GemmaTranslator(
     ): Result<TranslationResult> {
         return withContext(Dispatchers.IO) {
             try {
+                ensureModelReady()
+
                 if (!modelReady || llmInference == null) {
-                    initLlmInference()
+                    return@withContext Result.failure(
+                        Exception("翻译模型未加载。请先在设置中加载模型。")
+                    )
                 }
 
                 val prompt = buildPrompt(text, sourceLang, targetLang)
@@ -117,10 +110,67 @@ class GemmaTranslator(
         }
     }
 
+    private fun ensureModelReady() {
+        if (modelReady && modelFile.exists()) return
+
+        // Check internal storage first
+        if (modelFile.exists()) {
+            initLlmInference()
+            modelReady = true
+            return
+        }
+
+        // Try to copy from assets
+        val copied = copyModelFromAssets()
+        if (copied && modelFile.exists()) {
+            initLlmInference()
+            modelReady = true
+            return
+        }
+    }
+
+    private fun copyModelFromAssets(): Boolean {
+        return try {
+            val assetManager = context.assets
+            // Check if model exists in assets
+            val assetFiles = assetManager.list("") ?: emptyArray()
+            val modelInAssets = assetFiles.any { it == "models" } &&
+                    (assetManager.list("models") ?: emptyArray()).any { it == MODEL_FILENAME }
+
+            if (!modelInAssets) {
+                // Also check root assets (user may place it directly)
+                val rootAssets = assetManager.list("") ?: emptyArray()
+                if (rootAssets.any { it == MODEL_FILENAME }) {
+                    // Copy from root assets
+                    assetManager.open(MODEL_FILENAME).use { input ->
+                        FileOutputStream(modelFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    return true
+                }
+                return false
+            }
+
+            assetManager.open(assetsModelPath).use { input ->
+                FileOutputStream(modelFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            Log.i(TAG, "Model copied from assets to ${modelFile.absolutePath}")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to copy model from assets: ${e.message}")
+            false
+        }
+    }
+
     private fun initLlmInference() {
         if (!modelFile.exists()) {
-            throw Exception("Model not downloaded. Please download the language model first.")
+            throw Exception("Model file not found at ${modelFile.absolutePath}")
         }
+
+        Log.i(TAG, "Loading model from ${modelFile.absolutePath} (${modelFile.length() / 1024 / 1024}MB)")
 
         val options = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(modelFile.absolutePath)
@@ -169,5 +219,10 @@ Translation:"""
         llmInference?.close()
         llmInference = null
         modelReady = false
+    }
+
+    companion object {
+        private const val TAG = "GemmaTranslator"
+        const val MODEL_FILENAME = "translategemma-4b-it-q4_k_m.gguf"
     }
 }

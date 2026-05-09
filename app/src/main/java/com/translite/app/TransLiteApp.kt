@@ -30,12 +30,22 @@ class TransLiteApp : Application() {
             description = "屏幕文字识别通知"
         }
 
+        val modelChannel = NotificationChannel(
+            CHANNEL_MODEL,
+            "模型加载",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "翻译模型加载进度"
+        }
+
         manager.createNotificationChannel(floatingChannel)
         manager.createNotificationChannel(ocrChannel)
+        manager.createNotificationChannel(modelChannel)
     }
 
     companion object {
         const val CHANNEL_FLOATING = "floating_ball"
         const val CHANNEL_OCR = "screen_ocr"
+        const val CHANNEL_MODEL = "model_download"
     }
 }

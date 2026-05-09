@@ -3,6 +3,7 @@ package com.translite.app
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -32,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: TranslationViewModel
     private lateinit var engine: GemmaTranslator
-    private var isFloatingActive = false
+    private lateinit var prefs: SharedPreferences
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -60,6 +61,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        prefs = getSharedPreferences("translite_prefs", MODE_PRIVATE)
+
         val db = AppDatabase.getInstance(this)
         engine = GemmaTranslator(this)
         val repository = TranslationRepository(engine, db.translationDao())
@@ -69,12 +72,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TransLiteTheme {
+                val isFloatingActive = remember { mutableStateOf(prefs.getBoolean("floating_active", false)) }
+
                 MainApp(
                     viewModel = viewModel,
                     engine = engine,
-                    isFloatingActive = isFloatingActive,
+                    isFloatingActive = isFloatingActive.value,
                     onToggleFloating = { toggle ->
-                        isFloatingActive = toggle
+                        isFloatingActive.value = toggle
+                        prefs.edit().putBoolean("floating_active", toggle).apply()
                         if (toggle) {
                             startForegroundService(Intent(this, FloatingBallService::class.java))
                         } else {
@@ -122,11 +128,23 @@ fun MainApp(
     var showLanguagePacks by remember { mutableStateOf(false) }
 
     if (showLanguagePacks) {
-        LanguagePackScreen(
-            engine = engine,
-            modifier = Modifier.fillMaxSize()
-        )
-        // Back button handled by system
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("语言包管理") },
+                    navigationIcon = {
+                        IconButton(onClick = { showLanguagePacks = false }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+            LanguagePackScreen(
+                engine = engine,
+                modifier = Modifier.padding(padding)
+            )
+        }
         return
     }
 

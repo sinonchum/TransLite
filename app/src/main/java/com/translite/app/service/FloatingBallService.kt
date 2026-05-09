@@ -30,6 +30,7 @@ class FloatingBallService : Service() {
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private var expandedView: View? = null
+    private var closeButton: View? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var repository: TranslationRepository
 
@@ -60,7 +61,8 @@ class FloatingBallService : Service() {
     override fun onDestroy() {
         serviceScope.cancel()
         floatingView?.let { windowManager.removeView(it) }
-        expandedView?.let { windowManager.removeView(it) }
+        expandedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        closeButton?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
         super.onDestroy()
     }
 
@@ -93,6 +95,9 @@ class FloatingBallService : Service() {
         var initialTouchX = 0f
         var initialTouchY = 0f
         var isClick = true
+        var isLongPress = false
+        val longPressTimeout = 500L
+        var longPressJob: Job? = null
 
         ball.setOnTouchListener { _, event ->
             when (event.action) {
@@ -102,6 +107,16 @@ class FloatingBallService : Service() {
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     isClick = true
+                    isLongPress = false
+                    // Start long-press detection
+                    longPressJob = serviceScope.launch {
+                        delay(longPressTimeout)
+                        isLongPress = true
+                        // Long press detected — stop service
+                        withContext(Dispatchers.Main) {
+                            stopSelf()
+                        }
+                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -109,6 +124,7 @@ class FloatingBallService : Service() {
                     val dy = event.rawY - initialTouchY
                     if (dx * dx + dy * dy > dpToPx(10) * dpToPx(10)) {
                         isClick = false
+                        longPressJob?.cancel()
                     }
                     ballParams.x = initialX + dx.toInt()
                     ballParams.y = initialY + dy.toInt()
@@ -116,15 +132,22 @@ class FloatingBallService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (isClick) {
+                    longPressJob?.cancel()
+                    if (isClick && !isLongPress) {
                         toggleExpanded()
                     }
-                    // Snap to edge
-                    val centerX = ballParams.x + ballSize / 2
-                    val screenWidth = resources.displayMetrics.widthPixels
-                    ballParams.x = if (centerX < screenWidth / 2) 0 else screenWidth - ballSize
-                    windowManager.updateViewLayout(ball, ballParams)
+                    if (!isLongPress) {
+                        // Snap to edge
+                        val centerX = ballParams.x + ballSize / 2
+                        val screenWidth = resources.displayMetrics.widthPixels
+                        ballParams.x = if (centerX < screenWidth / 2) 0 else screenWidth - ballSize
+                        windowManager.updateViewLayout(ball, ballParams)
+                    }
                     true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    longPressJob?.cancel()
+                    false
                 }
                 else -> false
             }
@@ -132,6 +155,39 @@ class FloatingBallService : Service() {
 
         floatingView = ball
         windowManager.addView(ball, ballParams)
+
+        // Create close button overlay (small X above the ball)
+        createCloseButton(ballParams)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun createCloseButton(ballParams: WindowManager.LayoutParams) {
+        val closeSize = dpToPx(24)
+        val closeParams = WindowManager.LayoutParams(
+            closeSize, closeSize,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = ballParams.x + ballParams.width - dpToPx(6)
+            y = ballParams.y - dpToPx(6)
+        }
+
+        val closeBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(0xFFE53935.toInt())
+        }
+
+        val closeView = View(this).apply {
+            background = closeBg
+            setOnClickListener {
+                stopSelf()
+            }
+        }
+
+        closeButton = closeView
+        windowManager.addView(closeView, closeParams)
     }
 
     private fun toggleExpanded() {
@@ -170,11 +226,31 @@ class FloatingBallService : Service() {
             }
         }
 
+        // Title row with close button
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
         val title = TextView(this).apply {
             text = "TransLite"
             setTextColor(0xFF8AB4F8.toInt())
             textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
+
+        val closeExpandedBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            setBackgroundColor(0x00000000)
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            setOnClickListener {
+                // Stop the service entirely
+                stopSelf()
+            }
+        }
+
+        titleRow.addView(title)
+        titleRow.addView(closeExpandedBtn)
 
         val input = EditText(this).apply {
             hint = "输入翻译文本..."
@@ -218,8 +294,8 @@ class FloatingBallService : Service() {
             }
         }
 
-        val closeBtn = ImageButton(this).apply {
-            setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+        val minimizeBtn = ImageButton(this).apply {
+            setImageResource(android.R.drawable.ic_menu_revert)
             setBackgroundColor(0x00000000)
             setOnClickListener {
                 expandedView?.visibility = View.GONE
@@ -227,9 +303,9 @@ class FloatingBallService : Service() {
         }
 
         buttonRow.addView(translateBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        buttonRow.addView(closeBtn, LinearLayout.LayoutParams(dpToPx(40), dpToPx(40)))
+        buttonRow.addView(minimizeBtn, LinearLayout.LayoutParams(dpToPx(40), dpToPx(40)))
 
-        container.addView(title)
+        container.addView(titleRow)
         container.addView(input, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dpToPx(8) })
         container.addView(resultText)
         container.addView(buttonRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dpToPx(8) })
@@ -251,7 +327,7 @@ class FloatingBallService : Service() {
         )
         return NotificationCompat.Builder(this, TransLiteApp.CHANNEL_FLOATING)
             .setContentTitle("TransLite 悬浮翻译")
-            .setContentText("悬浮球已激活")
+            .setContentText("悬浮球已激活 · 长按可关闭")
             .setSmallIcon(android.R.drawable.ic_menu_search)
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopIntent)

@@ -55,7 +55,7 @@ fun SettingsScreen(
         ) { onLanguagePacks() },
         SettingsItem(
             title = "关于",
-            subtitle = "TransLite v1.0.0",
+            subtitle = "TransLite v1.2.0",
             icon = Icons.Default.Info
         ) { /* no-op */ }
     )

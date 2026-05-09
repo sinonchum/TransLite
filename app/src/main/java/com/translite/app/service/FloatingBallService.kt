@@ -9,10 +9,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.IBinder
 import android.view.*
-import android.widget.EditText
-import android.widget.ImageButton
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.*
 import androidx.core.app.NotificationCompat
 import com.translite.app.MainActivity
 import com.translite.app.TransLiteApp
@@ -26,7 +23,7 @@ class FloatingBallService : Service() {
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
     private var expandedView: View? = null
-    private var closeButton: View? = null
+    private var popupMenu: View? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var repository: TranslationRepository
 
@@ -58,7 +55,7 @@ class FloatingBallService : Service() {
         serviceScope.cancel()
         try { floatingView?.let { windowManager.removeView(it) } } catch (_: Exception) {}
         try { expandedView?.let { windowManager.removeView(it) } } catch (_: Exception) {}
-        try { closeButton?.let { windowManager.removeView(it) } } catch (_: Exception) {}
+        try { popupMenu?.let { windowManager.removeView(it) } } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -90,8 +87,6 @@ class FloatingBallService : Service() {
         var initialTouchX = 0f
         var initialTouchY = 0f
         var isClick = true
-        var isLongPress = false
-        var longPressJob: Job? = null
 
         ball.setOnTouchListener { _, event ->
             when (event.action) {
@@ -101,12 +96,6 @@ class FloatingBallService : Service() {
                     initialTouchX = event.rawX
                     initialTouchY = event.rawY
                     isClick = true
-                    isLongPress = false
-                    longPressJob = serviceScope.launch {
-                        delay(500L)
-                        isLongPress = true
-                        withContext(Dispatchers.Main) { stopSelf() }
-                    }
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -114,7 +103,6 @@ class FloatingBallService : Service() {
                     val dy = event.rawY - initialTouchY
                     if (dx * dx + dy * dy > dpToPx(10) * dpToPx(10)) {
                         isClick = false
-                        longPressJob?.cancel()
                     }
                     ballParams.x = initialX + dx.toInt()
                     ballParams.y = initialY + dy.toInt()
@@ -122,11 +110,17 @@ class FloatingBallService : Service() {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    longPressJob?.cancel()
-                    if (isClick && !isLongPress) {
-                        toggleExpanded()
-                    }
-                    if (!isLongPress) {
+                    if (isClick) {
+                        val holdTime = event.eventTime - event.downTime
+                        if (holdTime > 400) {
+                            // Long press: show popup menu
+                            showPopupMenu(ballParams)
+                        } else {
+                            // Short tap: toggle expanded panel
+                            toggleExpanded()
+                        }
+                    } else {
+                        // Drag release: snap to edge
                         val centerX = ballParams.x + ballSize / 2
                         val screenWidth = resources.displayMetrics.widthPixels
                         ballParams.x = if (centerX < screenWidth / 2) 0 else screenWidth - ballSize
@@ -134,46 +128,111 @@ class FloatingBallService : Service() {
                     }
                     true
                 }
-                MotionEvent.ACTION_CANCEL -> {
-                    longPressJob?.cancel()
-                    false
-                }
                 else -> false
             }
         }
 
         floatingView = ball
         windowManager.addView(ball, ballParams)
-        createCloseButton(ballParams)
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun createCloseButton(ballParams: WindowManager.LayoutParams) {
-        val closeSize = dpToPx(24)
-        val closeParams = WindowManager.LayoutParams(
-            closeSize, closeSize,
+    private fun showPopupMenu(ballParams: WindowManager.LayoutParams) {
+        dismissPopupMenu()
+
+        val menuWidth = dpToPx(140)
+        val menuHeight = dpToPx(100)
+        val params = WindowManager.LayoutParams(
+            menuWidth, menuHeight,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = ballParams.x + ballParams.width - dpToPx(6)
-            y = ballParams.y - dpToPx(6)
+            x = ballParams.x + ballParams.width + dpToPx(8)
+            y = ballParams.y
         }
 
-        val closeView = View(this).apply {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(0xFFE53935.toInt())
+                cornerRadius = dpToPx(12).toFloat()
+                setColor(0xFF2D2D2D.toInt())
+                setStroke(1, 0xFF444444.toInt())
             }
-            setOnClickListener { stopSelf() }
         }
 
-        closeButton = closeView
-        windowManager.addView(closeView, closeParams)
+        // Close button
+        val closeItem = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
+            isClickable = true
+            isFocusable = true
+            background = GradientDrawable().apply {
+                cornerRadius = dpToPx(8).toFloat()
+            }
+            setOnClickListener {
+                dismissPopupMenu()
+                stopSelf()
+            }
+        }
+        val closeIcon = TextView(this).apply {
+            text = "✕"
+            setTextColor(0xFFE53935.toInt())
+            textSize = 16f
+        }
+        val closeLabel = TextView(this).apply {
+            text = "  关闭悬浮球"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 14f
+        }
+        closeItem.addView(closeIcon)
+        closeItem.addView(closeLabel)
+
+        // Translate button
+        val translateItem = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
+            isClickable = true
+            isFocusable = true
+            background = GradientDrawable().apply {
+                cornerRadius = dpToPx(8).toFloat()
+            }
+            setOnClickListener {
+                dismissPopupMenu()
+                toggleExpanded()
+            }
+        }
+        val translateIcon = TextView(this).apply {
+            text = "🌐"
+            textSize = 16f
+        }
+        val translateLabel = TextView(this).apply {
+            text = "  打开翻译"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 14f
+        }
+        translateItem.addView(translateIcon)
+        translateItem.addView(translateLabel)
+
+        container.addView(closeItem)
+        container.addView(translateItem)
+
+        popupMenu = container
+        windowManager.addView(container, params)
+    }
+
+    private fun dismissPopupMenu() {
+        popupMenu?.let {
+            try { windowManager.removeView(it) } catch (_: Exception) {}
+        }
+        popupMenu = null
     }
 
     private fun toggleExpanded() {
+        dismissPopupMenu()
         if (expandedView?.isShown == true) {
             expandedView?.visibility = View.GONE
             return
@@ -304,7 +363,7 @@ class FloatingBallService : Service() {
         )
         return NotificationCompat.Builder(this, TransLiteApp.CHANNEL_FLOATING)
             .setContentTitle("TransLite 悬浮翻译")
-            .setContentText("悬浮球已激活 · 长按可关闭")
+            .setContentText("长按悬浮球可关闭或打开翻译")
             .setSmallIcon(android.R.drawable.ic_menu_search)
             .setContentIntent(pendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopIntent)

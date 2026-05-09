@@ -14,18 +14,16 @@ import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.os.IBinder
 import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.translite.app.MainActivity
-import com.translite.app.R
 import com.translite.app.TransLiteApp
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
-import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.domain.model.Language
 import com.translite.app.domain.ocr.MlKitOcr
 import kotlinx.coroutines.*
@@ -61,9 +59,20 @@ class ScreenCaptureService : Service() {
             }
             ACTION_CAPTURE -> {
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
-                val data = intent.getParcelableExtra<Intent>(EXTRA_DATA)
+                val data = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(EXTRA_DATA, Intent::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(EXTRA_DATA)
+                }
                 if (resultCode == Activity.RESULT_OK && data != null) {
                     startCapture(resultCode, data)
+                } else {
+                    showResultOverlay("屏幕截图权限未授予")
+                    serviceScope.launch {
+                        delay(2000)
+                        stopSelf()
+                    }
                 }
             }
         }
@@ -80,44 +89,70 @@ class ScreenCaptureService : Service() {
     private fun startCapture(resultCode: Int, data: Intent) {
         startForeground(NOTIFICATION_ID, createNotification())
 
-        val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        mediaProjection = projectionManager.getMediaProjection(resultCode, data)
+        try {
+            val projectionManager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            mediaProjection = projectionManager.getMediaProjection(resultCode, data)
 
-        val metrics = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
-        wm.defaultDisplay.getRealMetrics(metrics)
+            if (mediaProjection == null) {
+                showResultOverlay("屏幕截图服务初始化失败")
+                serviceScope.launch {
+                    delay(2000)
+                    stopSelf()
+                }
+                return
+            }
 
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
-        val density = metrics.densityDpi
+            val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+            @Suppress("DEPRECATION")
+            val metrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            wm.defaultDisplay.getRealMetrics(metrics)
 
-        imageReader = ImageReader.newInstance(
-            width, height, PixelFormat.RGBA_8888, 2
-        )
+            val width = metrics.widthPixels
+            val height = metrics.heightPixels
+            val density = metrics.densityDpi
 
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "TransLiteCapture",
-            width, height, density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader?.surface,
-            null, null
-        )
+            imageReader = ImageReader.newInstance(
+                width, height, PixelFormat.RGBA_8888, 2
+            )
 
-        // Capture after a short delay to let the display render
-        serviceScope.launch {
-            delay(500)
-            captureAndProcess()
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "TransLiteCapture",
+                width, height, density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader?.surface,
+                null, null
+            )
+
+            // Capture after a short delay to let the display render
+            serviceScope.launch {
+                delay(500)
+                captureAndProcess()
+            }
+        } catch (e: Exception) {
+            showResultOverlay("屏幕截图失败: ${e.message}")
+            serviceScope.launch {
+                delay(3000)
+                stopSelf()
+            }
         }
     }
 
     @SuppressLint("WrongConstant")
     private suspend fun captureAndProcess() {
-        val image = imageReader?.acquireLatestImage()
+        val image = try {
+            imageReader?.acquireLatestImage()
+        } catch (e: Exception) {
+            null
+        }
+
         if (image == null) {
             showResultOverlay("无法获取屏幕图像")
             cleanupCapture()
-            stopSelf()
+            serviceScope.launch {
+                delay(2000)
+                stopSelf()
+            }
             return
         }
 

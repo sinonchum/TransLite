@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -13,7 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.translite.app.TransLiteApp
 
 data class SettingsItem(
     val title: String,
@@ -35,6 +37,12 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as TransLiteApp
+
+    // HuggingFace Token state
+    var hfToken by remember { mutableStateOf(app.offlineEngine.getHfTokenFromPrefs()) }
+    var showToken by remember { mutableStateOf(false) }
+    var showTokenSaved by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -48,6 +56,81 @@ fun SettingsScreen(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
         }
+
+        // HuggingFace Token Section
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "HuggingFace Token",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "下载 Gemma 模型需要 Token",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = hfToken,
+                        onValueChange = { hfToken = it },
+                        label = { Text("hf_xxxxxxxxxxxx") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (showToken) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showToken = !showToken }) {
+                                Icon(
+                                    if (showToken) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (showToken) "隐藏" else "显示"
+                                )
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (showTokenSaved) {
+                            Text(
+                                text = "✓ 已保存",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(
+                                text = "在 huggingface.co/settings/tokens 获取",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.5f)
+                            )
+                        }
+
+                        FilledTonalButton(
+                            onClick = {
+                                app.offlineEngine.setHfToken(hfToken)
+                                showTokenSaved = true
+                            }
+                        ) {
+                            Text("保存")
+                        }
+                    }
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(8.dp)) }
 
         // Offline Model Section
         item {
@@ -116,7 +199,8 @@ fun SettingsScreen(
                     } else {
                         Button(
                             onClick = onDownloadModel,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = hfToken.isNotBlank()
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -124,12 +208,14 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "注意：需先在 HuggingFace 接受 Gemma 许可协议",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.5f)
-                    )
+                    if (hfToken.isBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "请先输入 HuggingFace Token",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
         }

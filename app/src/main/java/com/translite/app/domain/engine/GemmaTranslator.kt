@@ -24,7 +24,7 @@ import java.net.URL
  * - gemma3-1b-it (smaller general model, ~555MB q4, good for translation)
  *
  * Model is downloaded from HuggingFace on first use.
- * User must accept Gemma license on HuggingFace first.
+ * User must accept Gemma license AND provide HF token.
  */
 class GemmaTranslator(
     private val context: Context
@@ -92,6 +92,9 @@ class GemmaTranslator(
             return@flow
         }
 
+        // Get HF token from SharedPreferences
+        val hfToken = getHfToken()
+
         // Download from HuggingFace (try primary model first, then fallback)
         val models = listOf(
             ModelInfo(
@@ -114,7 +117,7 @@ class GemmaTranslator(
                 _downloadState.value = DownloadState.Downloading
                 emit(0f)
                 withContext(Dispatchers.IO) {
-                    downloadFromUrl(model.url, model.file)
+                    downloadFromUrl(model.url, model.file, hfToken)
                 }
                 synchronized(initLock) {
                     if (!modelReady) initLlmInference()
@@ -128,7 +131,11 @@ class GemmaTranslator(
             }
         }
 
-        val errorMsg = "翻译模型下载失败。请先在 HuggingFace 接受 Gemma 许可协议，然后重试。"
+        val errorMsg = if (hfToken.isNullOrBlank()) {
+            "翻译模型下载失败。请在设置中输入 HuggingFace Token。"
+        } else {
+            "翻译模型下载失败。请确认 Token 有效且已在 HuggingFace 接受 Gemma 许可。"
+        }
         _downloadState.value = DownloadState.Error(errorMsg)
         throw Exception(errorMsg)
     }
@@ -221,6 +228,23 @@ class GemmaTranslator(
         }
     }
 
+    private fun getHfToken(): String? {
+        return context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
+            .getString("hf_token", null)
+    }
+
+    fun setHfToken(token: String) {
+        context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putString("hf_token", token)
+            .apply()
+    }
+
+    fun getHfTokenFromPrefs(): String {
+        return context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
+            .getString("hf_token", "") ?: ""
+    }
+
     private fun copyModelFromAssets(): Boolean {
         return try {
             val assetManager = context.assets
@@ -250,7 +274,7 @@ class GemmaTranslator(
         }
     }
 
-    private fun downloadFromUrl(urlStr: String, targetFile: File) {
+    private fun downloadFromUrl(urlStr: String, targetFile: File, hfToken: String?) {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(urlStr)
@@ -258,10 +282,19 @@ class GemmaTranslator(
             connection.connectTimeout = 30_000
             connection.readTimeout = 120_000
             connection.requestMethod = "GET"
+
+            // Add HuggingFace auth header if token is available
+            if (!hfToken.isNullOrBlank()) {
+                connection.setRequestProperty("Authorization", "Bearer $hfToken")
+            }
+
             connection.connect()
 
-            if (connection.responseCode != 200) {
-                throw Exception("HTTP ${connection.responseCode}")
+            val responseCode = connection.responseCode
+            if (responseCode != 200) {
+                val errorBody = connection.errorStream?.bufferedReader()?.readText() ?: ""
+                Log.e(TAG, "HTTP $responseCode: $errorBody")
+                throw Exception("HTTP $responseCode - ${if (responseCode == 401 || responseCode == 403) "Token 无效或未接受 Gemma 许可" else "服务器错误"}")
             }
 
             val contentLength = connection.contentLength.toLong()
@@ -313,7 +346,6 @@ class GemmaTranslator(
         val srcName = langName(sourceLang)
         val tgtName = langName(targetLang)
 
-        // Use the official TranslateGemma prompt template for best results
         return """You are a professional $srcName to $tgtName translator. Your goal is to accurately convey the meaning and nuances of the original text.
 
 Produce only the $tgtName translation, without any additional explanations or commentary. Please translate the following $srcName text into $tgtName:

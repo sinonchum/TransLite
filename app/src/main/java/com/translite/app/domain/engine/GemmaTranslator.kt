@@ -2,7 +2,12 @@ package com.translite.app.domain.engine
 
 import android.content.Context
 import android.util.Log
-import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.SamplerConfig
 import com.translite.app.domain.model.Language
 import com.translite.app.domain.model.TranslationResult
 import kotlinx.coroutines.Dispatchers
@@ -17,20 +22,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Translation engine using MediaPipe LLM Inference API.
+ * Translation engine using LiteRT-LM (Gemma 4) for fully offline on-device translation.
  *
- * Supports two models:
- * - translate-gemma-4b-it (official translation model, ~3.9GB int8)
- * - gemma3-1b-it (smaller general model, ~555MB q4, good for translation)
- *
- * Model is downloaded from HuggingFace on first use.
- * User must accept Gemma license AND provide HF token.
+ * Uses the LiteRT-LM framework which is Google's recommended runtime for Gemma models.
+ * Supports .litertlm and .task model formats.
  */
 class GemmaTranslator(
     private val context: Context
 ) : TranslationEngine {
 
-    @Volatile private var llmInference: LlmInference? = null
+    @Volatile private var engine: Engine? = null
     @Volatile private var modelReady = false
     private val initLock = Any()
 
@@ -46,32 +47,31 @@ class GemmaTranslator(
     }
 
     private val modelDir: File by lazy {
-        // Use external files dir (no permission needed, survives app updates)
         val dir = context.getExternalFilesDir("models") ?: File(context.filesDir, "models")
         dir.mkdirs()
         dir
     }
 
-    // Primary: translate-gemma-4b-it (official)
-    // External model from shared storage
+    // Primary: Gemma 4 E2B (litertlm format, native Android)
+    private val primaryModelFile: File by lazy {
+        File(modelDir, "gemma-4-E2B-it.litertlm")
+    }
+
+    // Alternative: Web .task format (TFLite flatbuffer)
+    private val webModelFile: File by lazy {
+        File(modelDir, "gemma-4-E2B-it-web.task")
+    }
+
+    // Source on shared storage
     private val externalModelFile: File by lazy {
         File("/sdcard/translite_model.task")
     }
 
-    private val primaryModelFile: File by lazy {
-        File(modelDir, "translategemma-4b-it-int8-web.task")
-    }
-
-    // Fallback: gemma3-1b-it (smaller, q4 quantized)
-    private val fallbackModelFile: File by lazy {
-        File(modelDir, "gemma3-1b-it-q4-ekv2048.task")
-    }
-
     private val activeModelFile: File
         get() = when {
-            primaryModelFile.exists() -> primaryModelFile
-            fallbackModelFile.exists() -> fallbackModelFile
-            else -> primaryModelFile  // Will be copied from sdcard/assets
+            primaryModelFile.exists() && primaryModelFile.length() > 100_000_000 -> primaryModelFile
+            webModelFile.exists() && webModelFile.length() > 100_000_000 -> webModelFile
+            else -> primaryModelFile
         }
 
     override fun observeDownloadingLanguages(): Flow<Set<String>> = flow {
@@ -84,20 +84,20 @@ class GemmaTranslator(
     }
 
     override suspend fun downloadLanguage(lang: Language): Flow<Float> = flow {
-        if (activeModelFile.exists()) {
+        if (activeModelFile.exists() && activeModelFile.length() > 100_000_000) {
             synchronized(initLock) {
-                if (!modelReady) initLlmInference()
+                if (!modelReady) initEngine()
             }
             _downloadState.value = DownloadState.Ready
             emit(1f)
             return@flow
         }
 
-        // Try to copy from /sdcard/ if available (Android scoped storage workaround)
+        // Try to copy from /sdcard/ if available
         val sdcardCopied = withContext(Dispatchers.IO) { copyFromSdcardIfNeeded() }
         if (sdcardCopied) {
             synchronized(initLock) {
-                if (!modelReady) initLlmInference()
+                if (!modelReady) initEngine()
             }
             _downloadState.value = DownloadState.Ready
             emit(1f)
@@ -108,7 +108,7 @@ class GemmaTranslator(
         val copied = copyModelFromAssets()
         if (copied) {
             synchronized(initLock) {
-                if (!modelReady) initLlmInference()
+                if (!modelReady) initEngine()
             }
             _downloadState.value = DownloadState.Ready
             emit(1f)
@@ -118,22 +118,22 @@ class GemmaTranslator(
         // Get HF token from SharedPreferences
         val hfToken = getHfToken()
 
-        // Download from HuggingFace (try primary model first, then fallback)
+        // Download from HuggingFace
         val models = listOf(
             ModelInfo(
                 primaryModelFile,
-                "https://huggingface.co/litert-community/TranslateGemma-4B-IT/resolve/main/translategemma-4b-it-int8-web.task",
-                "translate-gemma-4b"
+                "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
+                "gemma-4-e2b-litertlm"
             ),
             ModelInfo(
-                fallbackModelFile,
-                "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv2048.task",
-                "gemma3-1b"
+                webModelFile,
+                "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task",
+                "gemma-4-e2b-web"
             )
         )
 
         for (model in models) {
-            if (model.file.exists()) continue
+            if (model.file.exists() && model.file.length() > 100_000_000) continue
 
             try {
                 Log.i(TAG, "Downloading ${model.name} from: ${model.url}")
@@ -143,7 +143,7 @@ class GemmaTranslator(
                     downloadFromUrl(model.url, model.file, hfToken)
                 }
                 synchronized(initLock) {
-                    if (!modelReady) initLlmInference()
+                    if (!modelReady) initEngine()
                 }
                 _downloadState.value = DownloadState.Ready
                 emit(1f)
@@ -154,23 +154,18 @@ class GemmaTranslator(
             }
         }
 
-        val errorMsg = if (hfToken.isNullOrBlank()) {
-            "翻译模型下载失败。请在设置中输入 HuggingFace Token。"
-        } else {
-            "翻译模型下载失败。请确认 Token 有效且已在 HuggingFace 接受 Gemma 许可。"
-        }
-        _downloadState.value = DownloadState.Error(errorMsg)
-        throw Exception(errorMsg)
+        _downloadState.value = DownloadState.Error("翻译模型下载失败。请检查网络连接。")
+        throw Exception("翻译模型下载失败")
     }
 
     override suspend fun deleteLanguageModel(lang: Language) {
         synchronized(initLock) {
-            llmInference?.close()
-            llmInference = null
+            engine?.close()
+            engine = null
             modelReady = false
         }
         primaryModelFile.delete()
-        fallbackModelFile.delete()
+        webModelFile.delete()
         _downloadState.value = DownloadState.Idle
     }
 
@@ -183,21 +178,33 @@ class GemmaTranslator(
             try {
                 ensureModelReady()
 
-                if (!modelReady || llmInference == null) {
+                if (!modelReady || engine == null) {
                     return@withContext Result.failure(
                         Exception("翻译模型未加载。请先在设置中下载模型。")
                     )
                 }
 
-                val inference = llmInference
+                val eng = engine
                     ?: return@withContext Result.failure(Exception("Model not initialized"))
 
                 val prompt = buildPrompt(text, sourceLang, targetLang)
                 Log.i(TAG, "Generating translation with prompt length: ${prompt.length}")
 
-                val response = inference.generateResponse(prompt)
-                val translated = extractTranslation(response)
+                // Create a conversation for this translation
+                val conversationConfig = ConversationConfig(
+                    samplerConfig = SamplerConfig(
+                        topK = 1,
+                        topP = 1.0,
+                        temperature = 0.1
+                    )
+                )
 
+                val conversation = eng.createConversation(conversationConfig)
+                val response = conversation.use { conv ->
+                    conv.sendMessage(prompt)
+                }
+
+                val translated = extractTranslation(response.toString())
                 Log.i(TAG, "Translation result: $translated")
 
                 Result.success(
@@ -221,12 +228,12 @@ class GemmaTranslator(
 
         synchronized(initLock) {
             if (activeModelFile.exists()) {
-                initLlmInference()
+                initEngine()
                 return true
             }
             val copied = copyModelFromAssets()
             if (copied && activeModelFile.exists()) {
-                initLlmInference()
+                initEngine()
                 return true
             }
         }
@@ -241,12 +248,12 @@ class GemmaTranslator(
             if (modelReady && activeModelFile.exists()) return
 
             if (activeModelFile.exists()) {
-                initLlmInference()
+                initEngine()
                 return
             }
             val copied = copyModelFromAssets()
             if (copied && activeModelFile.exists()) {
-                initLlmInference()
+                initEngine()
             }
         }
     }
@@ -268,15 +275,34 @@ class GemmaTranslator(
             .getString("hf_token", "") ?: ""
     }
 
+    private fun initEngine() {
+        val modelFile = activeModelFile
+        if (!modelFile.exists() || modelFile.length() < 100_000_000) {
+            throw Exception("Model file not found or too small at ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+        }
+
+        Log.i(TAG, "Loading model: ${modelFile.name} (${modelFile.length() / 1024 / 1024}MB)")
+
+        val engineConfig = EngineConfig(
+            modelPath = modelFile.absolutePath,
+            backend = Backend.CPU(),
+            cacheDir = context.cacheDir.path
+        )
+
+        engine = Engine(engineConfig)
+        engine!!.initialize()
+        modelReady = true
+        Log.i(TAG, "LiteRT-LM engine initialized successfully")
+    }
+
     private fun copyModelFromAssets(): Boolean {
         return try {
             val assetManager = context.assets
             val modelsDir = assetManager.list("models") ?: emptyArray()
 
-            // Try to copy primary model
             for (modelName in listOf(
-                "translategemma-4b-it-int8-web.task",
-                "gemma3-1b-it-q4-ekv2048.task"
+                "gemma-4-E2B-it.litertlm",
+                "gemma-4-E2B-it-web.task"
             )) {
                 if (modelsDir.any { it == modelName }) {
                     val targetFile = File(modelDir, modelName)
@@ -297,16 +323,46 @@ class GemmaTranslator(
         }
     }
 
+    private fun copyFromSdcardIfNeeded(): Boolean {
+        // Try .litertlm first, then .task
+        val candidates = listOf(
+            primaryModelFile to externalModelFile,
+            webModelFile to File("/sdcard/translite_model.task")
+        )
+
+        for ((target, source) in candidates) {
+            if (target.exists() && target.length() > 100_000_000) return true
+
+            if (source.exists() && source.length() > 100_000_000) {
+                return try {
+                    Log.i(TAG, "Copying model from ${source.absolutePath} to ${target.absolutePath}...")
+                    _downloadState.value = DownloadState.Downloading
+                    source.inputStream().use { input ->
+                        target.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Log.i(TAG, "Model copied: ${target.length() / 1024 / 1024}MB")
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "Copy failed from ${source.absolutePath}: ${e.message}")
+                    false
+                }
+            }
+        }
+
+        return false
+    }
+
     private fun downloadFromUrl(urlStr: String, targetFile: File, hfToken: String?) {
         var connection: HttpURLConnection? = null
         try {
             val url = URL(urlStr)
             connection = url.openConnection() as HttpURLConnection
             connection.connectTimeout = 30_000
-            connection.readTimeout = 120_000
+            connection.readTimeout = 300_000  // 5 min for large models
             connection.requestMethod = "GET"
 
-            // Add HuggingFace auth header if token is available
             if (!hfToken.isNullOrBlank()) {
                 connection.setRequestProperty("Authorization", "Bearer $hfToken")
             }
@@ -315,9 +371,7 @@ class GemmaTranslator(
 
             val responseCode = connection.responseCode
             if (responseCode != 200) {
-                val errorBody = connection.errorStream?.bufferedReader()?.readText() ?: ""
-                Log.e(TAG, "HTTP $responseCode: $errorBody")
-                throw Exception("HTTP $responseCode - ${if (responseCode == 401 || responseCode == 403) "Token 无效或未接受 Gemma 许可" else "服务器错误"}")
+                throw Exception("HTTP $responseCode")
             }
 
             val contentLength = connection.contentLength.toLong()
@@ -345,122 +399,22 @@ class GemmaTranslator(
         }
     }
 
-    private fun initLlmInference() {
-        val modelFile = activeModelFile
-        if (!modelFile.exists()) {
-            throw Exception("Model file not found at ${modelFile.absolutePath}")
-        }
-
-        Log.i(TAG, "Loading model: ${modelFile.name} (${modelFile.length() / 1024 / 1024}MB)")
-
-        // Correct MediaPipe LLM Inference API usage
-        val options = LlmInference.LlmInferenceOptions.builder()
-            .setModelPath(modelFile.absolutePath)
-            .setMaxTokens(512)
-            .setResultListener { _, _ -> }
-            .build()
-
-        llmInference = LlmInference.createFromOptions(context, options)
-        modelReady = true
-        Log.i(TAG, "Model loaded successfully")
-    }
-
-    /**
-     * Copy model from /sdcard/ to app storage (avoids scoped storage permission issues).
-     * Uses ContentResolver to read from shared storage.
-     */
-    private fun copyFromSdcardIfNeeded(): Boolean {
-        val targetFile = primaryModelFile
-        if (targetFile.exists()) return true
-
-        // Try direct file access first (works on some devices/Android versions)
-        val sdcardFile = externalModelFile
-        if (sdcardFile.exists()) {
-            return try {
-                Log.i(TAG, "Copying model from ${sdcardFile.absolutePath}...")
-                _downloadState.value = DownloadState.Downloading
-                sdcardFile.inputStream().use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                Log.i(TAG, "Model copied: ${targetFile.length() / 1024 / 1024}MB")
-                true
-            } catch (e: Exception) {
-                Log.w(TAG, "Direct copy failed: ${e.message}. Trying ContentResolver...")
-                // If direct access fails, try using MediaStore
-                copyViaMediaStore(sdcardFile.name, targetFile)
-            }
-        }
-
-        // Also try /sdcard/Download/ as alternative location
-        val downloadFile = File("/sdcard/Download/translite_model.task")
-        if (downloadFile.exists()) {
-            return try {
-                Log.i(TAG, "Copying from Download folder...")
-                _downloadState.value = DownloadState.Downloading
-                downloadFile.inputStream().use { input ->
-                    targetFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                Log.i(TAG, "Model copied from Download: ${targetFile.length() / 1024 / 1024}MB")
-                true
-            } catch (e: Exception) {
-                Log.w(TAG, "Download folder copy failed: ${e.message}")
-                copyViaMediaStore(downloadFile.name, targetFile)
-            }
-        }
-
-        return false
-    }
-
-    private fun copyViaMediaStore(fileName: String, targetFile: File): Boolean {
-        return try {
-            val uri = android.provider.MediaStore.Files.getContentUri("external")
-            val projection = arrayOf(android.provider.MediaStore.Files.FileColumns._ID)
-            val selection = "${android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
-            val selectionArgs = arrayOf(fileName)
-
-            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(android.provider.MediaStore.Files.FileColumns._ID))
-                    val fileUri = android.content.ContentUris.withAppendedId(uri, id)
-                    _downloadState.value = DownloadState.Downloading
-                    context.contentResolver.openInputStream(fileUri)?.use { input ->
-                        targetFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    Log.i(TAG, "Model copied via MediaStore: ${targetFile.length() / 1024 / 1024}MB")
-                    true
-                } else {
-                    false
-                }
-            } ?: false
-        } catch (e: Exception) {
-            Log.e(TAG, "MediaStore copy failed: ${e.message}")
-            false
-        }
-    }
-
     private fun buildPrompt(text: String, sourceLang: Language, targetLang: Language): String {
         val srcName = langName(sourceLang)
         val tgtName = langName(targetLang)
 
-        return """You are a professional $srcName to $tgtName translator. Your goal is to accurately convey the meaning and nuances of the original text.
-
-Produce only the $tgtName translation, without any additional explanations or commentary. Please translate the following $srcName text into $tgtName:
-
-$text"""
+        // Gemma 4 instruction format: <start_of_turn>user ... <start_of_turn>model
+        return "<start_of_turn>user\nYou are a professional $srcName to $tgtName translator. Translate the following text accurately and concisely. Output ONLY the translation, nothing else.\n\n$text\n<start_of_turn>model\n"
     }
 
     private fun extractTranslation(response: String): String {
         return response
-            .replace(Regex("^(Translate|Translation|Output|Here|The translation).*?\\n", RegexOption.DOT_MATCHES_ALL), "")
+            .replace(Regex("<start_of_turn>.*?"), "")
+            .replace(Regex("<end_of_turn>.*?"), "")
             .trim()
             .removePrefix("\"")
             .removeSuffix("\"")
+            .ifEmpty { response.trim() }
     }
 
     private fun langName(lang: Language): String = when (lang) {
@@ -479,8 +433,8 @@ $text"""
 
     fun close() {
         synchronized(initLock) {
-            llmInference?.close()
-            llmInference = null
+            engine?.close()
+            engine = null
             modelReady = false
         }
     }

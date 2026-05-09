@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
 
@@ -21,7 +22,6 @@ android {
 
     signingConfigs {
         create("release") {
-            // Use debug keystore for release builds (sideloaded APK)
             storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -59,10 +59,6 @@ android {
         compose = true
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
-
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
@@ -91,11 +87,8 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // MediaPipe LLM Inference (TranslateGemma)
-    implementation("com.google.mediapipe:tasks-genai:0.10.18")
-
-    // MediaPipe Model Loader
-    implementation("com.google.mediapipe:tasks-text:0.10.18")
+    // LiteRT-LM (Gemma 4 on-device inference)
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.11.0")
 
     // CameraX
     val cameraxVersion = "1.3.1"
@@ -108,10 +101,10 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.0")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.0")
 
-    // Room
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    // Room (upgraded for Kotlin 2.2.x compatibility)
+    implementation("androidx.room:room-runtime:2.7.1")
+    implementation("androidx.room:room-ktx:2.7.1")
+    ksp("androidx.room:room-compiler:2.7.1")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

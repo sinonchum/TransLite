@@ -3,12 +3,22 @@ package com.translite.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.translite.app.domain.engine.GemmaTranslator
 
 class TransLiteApp : Application() {
 
+    lateinit var gemmaTranslator: GemmaTranslator
+        private set
+
     override fun onCreate() {
         super.onCreate()
+        gemmaTranslator = GemmaTranslator(this)
         createNotificationChannels()
+    }
+
+    override fun onTerminate() {
+        gemmaTranslator.close()
+        super.onTerminate()
     }
 
     private fun createNotificationChannels() {

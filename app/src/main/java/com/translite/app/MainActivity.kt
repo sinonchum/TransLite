@@ -3,7 +3,6 @@ package com.translite.app
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -22,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
-import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.service.FloatingBallService
 import com.translite.app.service.ScreenCaptureService
 import com.translite.app.ui.screens.*
@@ -32,8 +30,7 @@ import com.translite.app.ui.viewmodel.TranslationViewModel
 class MainActivity : ComponentActivity() {
 
     private lateinit var viewModel: TranslationViewModel
-    private lateinit var engine: GemmaTranslator
-    private lateinit var prefs: SharedPreferences
+    private var isFloatingActive = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -61,10 +58,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        prefs = getSharedPreferences("translite_prefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences("translite_prefs", MODE_PRIVATE)
+        isFloatingActive = prefs.getBoolean("floating_active", false)
 
         val db = AppDatabase.getInstance(this)
-        engine = GemmaTranslator(this)
+        val engine = (application as TransLiteApp).gemmaTranslator
         val repository = TranslationRepository(engine, db.translationDao())
         viewModel = TranslationViewModel(repository)
 
@@ -72,14 +70,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TransLiteTheme {
-                val isFloatingActive = remember { mutableStateOf(prefs.getBoolean("floating_active", false)) }
-
                 MainApp(
                     viewModel = viewModel,
                     engine = engine,
-                    isFloatingActive = isFloatingActive.value,
+                    isFloatingActive = isFloatingActive,
                     onToggleFloating = { toggle ->
-                        isFloatingActive.value = toggle
+                        isFloatingActive = toggle
                         prefs.edit().putBoolean("floating_active", toggle).apply()
                         if (toggle) {
                             startForegroundService(Intent(this, FloatingBallService::class.java))
@@ -117,7 +113,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp(
     viewModel: TranslationViewModel,
-    engine: GemmaTranslator,
+    engine: com.translite.app.domain.engine.GemmaTranslator,
     isFloatingActive: Boolean,
     onToggleFloating: (Boolean) -> Unit,
     onScreenCapture: () -> Unit

@@ -7,21 +7,17 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.IBinder
 import android.view.*
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.translite.app.MainActivity
-import com.translite.app.R
 import com.translite.app.TransLiteApp
 import com.translite.app.data.db.AppDatabase
 import com.translite.app.data.repository.TranslationRepository
-import com.translite.app.domain.engine.GemmaTranslator
 import com.translite.app.domain.model.Language
 import kotlinx.coroutines.*
 
@@ -40,7 +36,7 @@ class FloatingBallService : Service() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val db = AppDatabase.getInstance(this)
-        val engine = GemmaTranslator(this@FloatingBallService)
+        val engine = (application as TransLiteApp).gemmaTranslator
         repository = TranslationRepository(engine, db.translationDao())
     }
 
@@ -60,15 +56,14 @@ class FloatingBallService : Service() {
 
     override fun onDestroy() {
         serviceScope.cancel()
-        floatingView?.let { windowManager.removeView(it) }
-        expandedView?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
-        closeButton?.let { try { windowManager.removeView(it) } catch (_: Exception) {} }
+        try { floatingView?.let { windowManager.removeView(it) } } catch (_: Exception) {}
+        try { expandedView?.let { windowManager.removeView(it) } } catch (_: Exception) {}
+        try { closeButton?.let { windowManager.removeView(it) } } catch (_: Exception) {}
         super.onDestroy()
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createFloatingBall() {
-        // Floating ball
         val ballSize = dpToPx(56)
         val ballParams = WindowManager.LayoutParams(
             ballSize, ballSize,
@@ -96,7 +91,6 @@ class FloatingBallService : Service() {
         var initialTouchY = 0f
         var isClick = true
         var isLongPress = false
-        val longPressTimeout = 500L
         var longPressJob: Job? = null
 
         ball.setOnTouchListener { _, event ->
@@ -108,14 +102,10 @@ class FloatingBallService : Service() {
                     initialTouchY = event.rawY
                     isClick = true
                     isLongPress = false
-                    // Start long-press detection
                     longPressJob = serviceScope.launch {
-                        delay(longPressTimeout)
+                        delay(500L)
                         isLongPress = true
-                        // Long press detected — stop service
-                        withContext(Dispatchers.Main) {
-                            stopSelf()
-                        }
+                        withContext(Dispatchers.Main) { stopSelf() }
                     }
                     true
                 }
@@ -137,7 +127,6 @@ class FloatingBallService : Service() {
                         toggleExpanded()
                     }
                     if (!isLongPress) {
-                        // Snap to edge
                         val centerX = ballParams.x + ballSize / 2
                         val screenWidth = resources.displayMetrics.widthPixels
                         ballParams.x = if (centerX < screenWidth / 2) 0 else screenWidth - ballSize
@@ -155,8 +144,6 @@ class FloatingBallService : Service() {
 
         floatingView = ball
         windowManager.addView(ball, ballParams)
-
-        // Create close button overlay (small X above the ball)
         createCloseButton(ballParams)
     }
 
@@ -174,16 +161,12 @@ class FloatingBallService : Service() {
             y = ballParams.y - dpToPx(6)
         }
 
-        val closeBg = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(0xFFE53935.toInt())
-        }
-
         val closeView = View(this).apply {
-            background = closeBg
-            setOnClickListener {
-                stopSelf()
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0xFFE53935.toInt())
             }
+            setOnClickListener { stopSelf() }
         }
 
         closeButton = closeView
@@ -226,7 +209,6 @@ class FloatingBallService : Service() {
             }
         }
 
-        // Title row with close button
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -243,10 +225,7 @@ class FloatingBallService : Service() {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundColor(0x00000000)
             setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
-            setOnClickListener {
-                // Stop the service entirely
-                stopSelf()
-            }
+            setOnClickListener { stopSelf() }
         }
 
         titleRow.addView(title)
@@ -297,9 +276,7 @@ class FloatingBallService : Service() {
         val minimizeBtn = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_revert)
             setBackgroundColor(0x00000000)
-            setOnClickListener {
-                expandedView?.visibility = View.GONE
-            }
+            setOnClickListener { expandedView?.visibility = View.GONE }
         }
 
         buttonRow.addView(translateBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))

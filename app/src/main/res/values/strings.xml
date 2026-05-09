@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">TransLite</string>
+    <string name="input_hint">输入要翻译的文本...</string>
+    <string name="translate">翻译</string>
+    <string name="source_lang">源语言</string>
+    <string name="target_lang">目标语言</string>
+    <string name="history">历史记录</string>
+    <string name="settings">设置</string>
+    <string name="download_lang">下载语言包</string>
+    <string name="downloading">下载中...</string>
+    <string name="download_complete">下载完成</string>
+    <string name="copy_result">复制结果</string>
+    <string name="clear">清除</string>
+</resources>

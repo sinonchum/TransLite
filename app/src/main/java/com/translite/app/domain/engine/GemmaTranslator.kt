@@ -46,12 +46,20 @@ class GemmaTranslator(
     }
 
     private val modelDir: File by lazy {
-        File(context.filesDir, "models").also { it.mkdirs() }
+        // Use external files dir (no permission needed, survives app updates)
+        val dir = context.getExternalFilesDir("models") ?: File(context.filesDir, "models")
+        dir.mkdirs()
+        dir
     }
 
     // Primary: translate-gemma-4b-it (official)
+    // External model from shared storage
+    private val externalModelFile: File by lazy {
+        File("/sdcard/translite_model.task")
+    }
+
     private val primaryModelFile: File by lazy {
-        File(modelDir, "translategemma-4b-it-int8-web.task")
+        File(modelDir, "gemma-4-E2B-it-web.task")
     }
 
     // Fallback: gemma3-1b-it (smaller, q4 quantized)
@@ -60,7 +68,11 @@ class GemmaTranslator(
     }
 
     private val activeModelFile: File
-        get() = if (primaryModelFile.exists()) primaryModelFile else fallbackModelFile
+        get() = when {
+            primaryModelFile.exists() -> primaryModelFile
+            fallbackModelFile.exists() -> fallbackModelFile
+            else -> primaryModelFile  // Will be copied from sdcard/assets
+        }
 
     override fun observeDownloadingLanguages(): Flow<Set<String>> = flow {
         emit(emptySet())
@@ -73,6 +85,17 @@ class GemmaTranslator(
 
     override suspend fun downloadLanguage(lang: Language): Flow<Float> = flow {
         if (activeModelFile.exists()) {
+            synchronized(initLock) {
+                if (!modelReady) initLlmInference()
+            }
+            _downloadState.value = DownloadState.Ready
+            emit(1f)
+            return@flow
+        }
+
+        // Try to copy from /sdcard/ if available (Android scoped storage workaround)
+        val sdcardCopied = withContext(Dispatchers.IO) { copyFromSdcardIfNeeded() }
+        if (sdcardCopied) {
             synchronized(initLock) {
                 if (!modelReady) initLlmInference()
             }
@@ -340,6 +363,85 @@ class GemmaTranslator(
         llmInference = LlmInference.createFromOptions(context, options)
         modelReady = true
         Log.i(TAG, "Model loaded successfully")
+    }
+
+    /**
+     * Copy model from /sdcard/ to app storage (avoids scoped storage permission issues).
+     * Uses ContentResolver to read from shared storage.
+     */
+    private fun copyFromSdcardIfNeeded(): Boolean {
+        val targetFile = primaryModelFile
+        if (targetFile.exists()) return true
+
+        // Try direct file access first (works on some devices/Android versions)
+        val sdcardFile = externalModelFile
+        if (sdcardFile.exists()) {
+            return try {
+                Log.i(TAG, "Copying model from ${sdcardFile.absolutePath}...")
+                _downloadState.value = DownloadState.Downloading
+                sdcardFile.inputStream().use { input ->
+                    targetFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Log.i(TAG, "Model copied: ${targetFile.length() / 1024 / 1024}MB")
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "Direct copy failed: ${e.message}. Trying ContentResolver...")
+                // If direct access fails, try using MediaStore
+                copyViaMediaStore(sdcardFile.name, targetFile)
+            }
+        }
+
+        // Also try /sdcard/Download/ as alternative location
+        val downloadFile = File("/sdcard/Download/translite_model.task")
+        if (downloadFile.exists()) {
+            return try {
+                Log.i(TAG, "Copying from Download folder...")
+                _downloadState.value = DownloadState.Downloading
+                downloadFile.inputStream().use { input ->
+                    targetFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Log.i(TAG, "Model copied from Download: ${targetFile.length() / 1024 / 1024}MB")
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "Download folder copy failed: ${e.message}")
+                copyViaMediaStore(downloadFile.name, targetFile)
+            }
+        }
+
+        return false
+    }
+
+    private fun copyViaMediaStore(fileName: String, targetFile: File): Boolean {
+        return try {
+            val uri = android.provider.MediaStore.Files.getContentUri("external")
+            val projection = arrayOf(android.provider.MediaStore.Files.FileColumns._ID)
+            val selection = "${android.provider.MediaStore.Files.FileColumns.DISPLAY_NAME} = ?"
+            val selectionArgs = arrayOf(fileName)
+
+            context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val id = cursor.getLong(cursor.getColumnIndexOrThrow(android.provider.MediaStore.Files.FileColumns._ID))
+                    val fileUri = android.content.ContentUris.withAppendedId(uri, id)
+                    _downloadState.value = DownloadState.Downloading
+                    context.contentResolver.openInputStream(fileUri)?.use { input ->
+                        targetFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Log.i(TAG, "Model copied via MediaStore: ${targetFile.length() / 1024 / 1024}MB")
+                    true
+                } else {
+                    false
+                }
+            } ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "MediaStore copy failed: ${e.message}")
+            false
+        }
     }
 
     private fun buildPrompt(text: String, sourceLang: Language, targetLang: Language): String {

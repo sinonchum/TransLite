@@ -114,6 +114,21 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (perms.isNotEmpty()) permissionLauncher.launch(perms.toTypedArray())
+
+        // Request MANAGE_EXTERNAL_STORAGE for model file access
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!android.os.Environment.isExternalStorageManager()) {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    startActivity(intent)
+                }
+            }
+        }
     }
 }
 

@@ -23,7 +23,10 @@ data class TranslationUiState(
     val isModelReady: Boolean = false,
     val isModelDownloading: Boolean = false,
     val modelStatusText: String = "",
-    val downloadProgress: Int = 0
+    val downloadProgress: Int = 0,
+    val downloadSpeedMBps: Float = 0f,
+    val downloadDownloadedMB: Long = 0,
+    val downloadTotalMB: Long = 0
 )
 
 class TranslationViewModel(
@@ -80,6 +83,9 @@ class TranslationViewModel(
                         _uiState.update {
                             it.copy(
                                 downloadProgress = state.percent,
+                                downloadSpeedMBps = state.speedMBps,
+                                downloadDownloadedMB = state.downloadedMB,
+                                downloadTotalMB = state.totalMB,
                                 modelStatusText = "下载中... ${state.percent}%"
                             )
                         }

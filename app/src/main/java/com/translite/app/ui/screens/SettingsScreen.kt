@@ -25,6 +25,9 @@ fun SettingsScreen(
     isModelReady: Boolean = false,
     isModelDownloading: Boolean = false,
     downloadProgress: Int = 0,
+    downloadSpeedMBps: Float = 0f,
+    downloadDownloadedMB: Long = 0,
+    downloadTotalMB: Long = 0,
     modelStatusText: String = "",
     onDownloadModel: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -92,25 +95,30 @@ fun SettingsScreen(
                         // Downloading / Loading — show progress
                         isModelDownloading -> {
                             Column(modifier = Modifier.fillMaxWidth()) {
+                                // Progress bar
                                 if (downloadProgress in 1..99) {
                                     LinearProgressIndicator(
                                         progress = { downloadProgress / 100f },
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
                                     )
                                 } else {
-                                    // Indeterminate progress (loading / copying)
                                     LinearProgressIndicator(
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
 
+                                // Status text
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
+                                        modifier = Modifier.size(14.dp),
                                         strokeWidth = 2.dp
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -121,13 +129,34 @@ fun SettingsScreen(
                                     )
                                 }
 
-                                if (downloadProgress in 1..99) {
+                                // Download details: percentage + MB + speed
+                                if (downloadProgress in 1..99 && downloadTotalMB > 0) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Big percentage number
                                     Text(
                                         text = "$downloadProgress%",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.padding(top = 4.dp)
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        color = MaterialTheme.colorScheme.primary
                                     )
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // MB downloaded / total
+                                    Text(
+                                        text = "${downloadDownloadedMB}MB / ${downloadTotalMB}MB",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+
+                                    // Speed
+                                    if (downloadSpeedMBps > 0) {
+                                        Text(
+                                            text = "速度: ${String.format("%.1f", downloadSpeedMBps)} MB/s",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                        )
+                                    }
                                 }
                             }
                         }

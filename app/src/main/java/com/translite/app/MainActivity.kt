@@ -266,6 +266,9 @@ fun MainApp(
                 isModelReady = uiState.isModelReady,
                 isModelDownloading = uiState.isModelDownloading,
                 downloadProgress = uiState.downloadProgress,
+                downloadSpeedMBps = uiState.downloadSpeedMBps,
+                downloadDownloadedMB = uiState.downloadDownloadedMB,
+                downloadTotalMB = uiState.downloadTotalMB,
                 modelStatusText = uiState.modelStatusText,
                 onDownloadModel = { viewModel.downloadOfflineModel() },
                 modifier = Modifier.padding(padding)

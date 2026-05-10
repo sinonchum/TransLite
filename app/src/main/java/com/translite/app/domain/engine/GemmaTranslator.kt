@@ -38,7 +38,12 @@ class GemmaTranslator(
     sealed class DownloadState {
         data object Idle : DownloadState()
         data object Downloading : DownloadState()
-        data class Progress(val percent: Int) : DownloadState()
+        data class Progress(
+            val percent: Int,
+            val downloadedMB: Long = 0,
+            val totalMB: Long = 0,
+            val speedMBps: Float = 0f
+        ) : DownloadState()
         data object Copying : DownloadState()
         data object Loading : DownloadState()
         data object Ready : DownloadState()
@@ -107,8 +112,8 @@ class GemmaTranslator(
         emit(0f)
         try {
             withContext(Dispatchers.IO) {
-                downloadFromHuggingFace { progress ->
-                    _downloadState.value = DownloadState.Progress(progress)
+                downloadFromHuggingFace { progress, downloadedMB, totalMB, speed ->
+                    _downloadState.value = DownloadState.Progress(progress, downloadedMB, totalMB, speed)
                 }
             }
 
@@ -290,7 +295,7 @@ class GemmaTranslator(
         }
     }
 
-    private fun downloadFromHuggingFace(onProgress: (Int) -> Unit) {
+    private fun downloadFromHuggingFace(onProgress: (Int, Long, Long, Float) -> Unit) {
         val tmpFile = File(modelFile.path + ".tmp")
 
         try {
@@ -307,21 +312,39 @@ class GemmaTranslator(
             }
 
             val contentLength = connection.contentLength.toLong()
-            Log.i(TAG, "Downloading model from HuggingFace (${contentLength / 1024 / 1024}MB)...")
+            val totalMB = contentLength / (1024 * 1024)
+            Log.i(TAG, "Downloading model from HuggingFace (${totalMB}MB)...")
 
             connection.inputStream.use { input ->
                 FileOutputStream(tmpFile).use { output ->
-                    val buffer = ByteArray(1024 * 1024)
+                    val buffer = ByteArray(1024 * 1024) // 1MB buffer
                     var totalDownloaded = 0L
                     var bytesRead: Int
+                    val startTime = System.currentTimeMillis()
+                    var lastReportTime = startTime
+                    var lastReportBytes = 0L
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
                         totalDownloaded += bytesRead
 
-                        if (contentLength > 0) {
-                            val progress = (totalDownloaded * 100 / contentLength).toInt()
-                            onProgress(progress)
+                        val now = System.currentTimeMillis()
+                        val elapsed = now - lastReportTime
+
+                        // Report every 500ms to avoid flooding the UI
+                        if (elapsed >= 500 || totalDownloaded == contentLength) {
+                            val totalElapsed = (now - startTime).coerceAtLeast(1)
+                            val speed = (totalDownloaded.toFloat() / 1024 / 1024) / (totalElapsed / 1000f)
+                            val downloadedMB = totalDownloaded / (1024 * 1024)
+                            val percent = if (contentLength > 0) {
+                                (totalDownloaded * 100 / contentLength).toInt()
+                            } else {
+                                0
+                            }
+
+                            onProgress(percent, downloadedMB, totalMB, speed)
+                            lastReportTime = now
+                            lastReportBytes = totalDownloaded
                         }
                     }
                 }

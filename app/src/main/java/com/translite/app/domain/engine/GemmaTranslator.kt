@@ -23,9 +23,6 @@ import java.net.URL
 
 /**
  * Translation engine using LiteRT-LM (Gemma 4) for fully offline on-device translation.
- *
- * Uses the LiteRT-LM framework which is Google's recommended runtime for Gemma models.
- * Supports .litertlm and .task model formats.
  */
 class GemmaTranslator(
     private val context: Context
@@ -42,6 +39,8 @@ class GemmaTranslator(
         data object Idle : DownloadState()
         data object Downloading : DownloadState()
         data class Progress(val percent: Int) : DownloadState()
+        data object Copying : DownloadState()
+        data object Loading : DownloadState()
         data object Ready : DownloadState()
         data class Error(val message: String) : DownloadState()
     }
@@ -52,27 +51,9 @@ class GemmaTranslator(
         dir
     }
 
-    // Primary: Gemma 4 E2B (litertlm format, native Android)
-    private val primaryModelFile: File by lazy {
-        File(modelDir, "gemma-4-E2B-it.litertlm")
+    private val modelFile: File by lazy {
+        File(modelDir, MODEL_FILENAME)
     }
-
-    // Alternative: Web .task format (TFLite flatbuffer)
-    private val webModelFile: File by lazy {
-        File(modelDir, "gemma-4-E2B-it-web.task")
-    }
-
-    // Source on shared storage
-    private val externalModelFile: File by lazy {
-        File("/sdcard/translite_model.task")
-    }
-
-    private val activeModelFile: File
-        get() = when {
-            primaryModelFile.exists() && primaryModelFile.length() > 100_000_000 -> primaryModelFile
-            webModelFile.exists() && webModelFile.length() > 100_000_000 -> webModelFile
-            else -> primaryModelFile
-        }
 
     override fun observeDownloadingLanguages(): Flow<Set<String>> = flow {
         emit(emptySet())
@@ -84,78 +65,70 @@ class GemmaTranslator(
     }
 
     override suspend fun downloadLanguage(lang: Language): Flow<Float> = flow {
-        if (activeModelFile.exists() && activeModelFile.length() > 100_000_000) {
-            synchronized(initLock) {
-                if (!modelReady) initEngine()
-            }
+        // If model already exists and engine is ready, nothing to do
+        if (modelReady && modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE) {
             _downloadState.value = DownloadState.Ready
             emit(1f)
             return@flow
         }
 
-        // Try to copy from /sdcard/ if available
-        val sdcardCopied = withContext(Dispatchers.IO) { copyFromSdcardIfNeeded() }
-        if (sdcardCopied) {
-            synchronized(initLock) {
-                if (!modelReady) initEngine()
-            }
-            _downloadState.value = DownloadState.Ready
-            emit(1f)
-            return@flow
-        }
-
-        // Try assets first
-        val copied = copyModelFromAssets()
-        if (copied) {
-            synchronized(initLock) {
-                if (!modelReady) initEngine()
-            }
-            _downloadState.value = DownloadState.Ready
-            emit(1f)
-            return@flow
-        }
-
-        // Get HF token from SharedPreferences
-        val hfToken = getHfToken()
-
-        // Download from HuggingFace
-        val models = listOf(
-            ModelInfo(
-                primaryModelFile,
-                "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
-                "gemma-4-e2b-litertlm"
-            ),
-            ModelInfo(
-                webModelFile,
-                "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task",
-                "gemma-4-e2b-web"
-            )
-        )
-
-        for (model in models) {
-            if (model.file.exists() && model.file.length() > 100_000_000) continue
-
-            try {
-                Log.i(TAG, "Downloading ${model.name} from: ${model.url}")
-                _downloadState.value = DownloadState.Downloading
-                emit(0f)
-                withContext(Dispatchers.IO) {
-                    downloadFromUrl(model.url, model.file, hfToken)
-                }
+        // If model file exists but engine not initialized, just load it
+        if (modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE) {
+            _downloadState.value = DownloadState.Loading
+            emit(0.5f)
+            withContext(Dispatchers.IO) {
                 synchronized(initLock) {
                     if (!modelReady) initEngine()
                 }
-                _downloadState.value = DownloadState.Ready
-                emit(1f)
-                return@flow
-            } catch (e: Exception) {
-                Log.w(TAG, "Download failed from ${model.url}: ${e.message}")
-                model.file.delete()
             }
+            _downloadState.value = DownloadState.Ready
+            emit(1f)
+            return@flow
         }
 
-        _downloadState.value = DownloadState.Error("翻译模型下载失败。请检查网络连接。")
-        throw Exception("翻译模型下载失败")
+        // Try assets first (bundled in APK)
+        _downloadState.value = DownloadState.Copying
+        emit(0f)
+        val copied = withContext(Dispatchers.IO) { copyModelFromAssets() }
+        if (copied && modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE) {
+            _downloadState.value = DownloadState.Loading
+            withContext(Dispatchers.IO) {
+                synchronized(initLock) {
+                    if (!modelReady) initEngine()
+                }
+            }
+            _downloadState.value = DownloadState.Ready
+            emit(1f)
+            return@flow
+        }
+
+        // Download from HuggingFace (public repo, no token required)
+        _downloadState.value = DownloadState.Downloading
+        emit(0f)
+        try {
+            withContext(Dispatchers.IO) {
+                downloadFromHuggingFace { progress ->
+                    _downloadState.value = DownloadState.Progress(progress)
+                }
+            }
+
+            // Download complete — now load the engine
+            _downloadState.value = DownloadState.Loading
+            withContext(Dispatchers.IO) {
+                synchronized(initLock) {
+                    if (!modelReady) initEngine()
+                }
+            }
+            _downloadState.value = DownloadState.Ready
+            emit(1f)
+        } catch (e: Exception) {
+            Log.e(TAG, "Download failed", e)
+            modelFile.delete()
+            _downloadState.value = DownloadState.Error(
+                "模型下载失败: ${e.message}\n请检查网络连接后重试。"
+            )
+            throw e
+        }
     }
 
     override suspend fun deleteLanguageModel(lang: Language) {
@@ -164,8 +137,7 @@ class GemmaTranslator(
             engine = null
             modelReady = false
         }
-        primaryModelFile.delete()
-        webModelFile.delete()
+        modelFile.delete()
         _downloadState.value = DownloadState.Idle
     }
 
@@ -190,7 +162,6 @@ class GemmaTranslator(
                 val prompt = buildPrompt(text, sourceLang, targetLang)
                 Log.i(TAG, "Generating translation with prompt length: ${prompt.length}")
 
-                // Create a conversation for this translation
                 val conversationConfig = ConversationConfig(
                     samplerConfig = SamplerConfig(
                         topK = 1,
@@ -224,15 +195,15 @@ class GemmaTranslator(
     }
 
     suspend fun ensureModelAvailable(): Boolean {
-        if (modelReady && activeModelFile.exists()) return true
+        if (modelReady && modelFile.exists()) return true
 
         synchronized(initLock) {
-            if (activeModelFile.exists()) {
+            if (modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE) {
                 initEngine()
                 return true
             }
             val copied = copyModelFromAssets()
-            if (copied && activeModelFile.exists()) {
+            if (copied && modelFile.exists()) {
                 initEngine()
                 return true
             }
@@ -241,44 +212,33 @@ class GemmaTranslator(
         return false
     }
 
+    fun isModelDownloaded(): Boolean {
+        return modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE
+    }
+
     private fun ensureModelReady() {
-        if (modelReady && activeModelFile.exists()) return
+        if (modelReady && modelFile.exists()) return
 
         synchronized(initLock) {
-            if (modelReady && activeModelFile.exists()) return
+            if (modelReady && modelFile.exists()) return
 
-            if (activeModelFile.exists()) {
+            if (modelFile.exists() && modelFile.length() > MIN_MODEL_SIZE) {
                 initEngine()
                 return
             }
             val copied = copyModelFromAssets()
-            if (copied && activeModelFile.exists()) {
+            if (copied && modelFile.exists()) {
                 initEngine()
             }
         }
     }
 
-    private fun getHfToken(): String? {
-        return context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
-            .getString("hf_token", null)
-    }
-
-    fun setHfToken(token: String) {
-        context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .putString("hf_token", token)
-            .apply()
-    }
-
-    fun getHfTokenFromPrefs(): String {
-        return context.getSharedPreferences("translite_prefs", Context.MODE_PRIVATE)
-            .getString("hf_token", "") ?: ""
-    }
-
     private fun initEngine() {
-        val modelFile = activeModelFile
-        if (!modelFile.exists() || modelFile.length() < 100_000_000) {
-            throw Exception("Model file not found or too small at ${modelFile.absolutePath} (${modelFile.length()} bytes)")
+        if (!modelFile.exists() || modelFile.length() < MIN_MODEL_SIZE) {
+            throw Exception(
+                "Model file not found or too small at ${modelFile.absolutePath} " +
+                "(${modelFile.length()} bytes)"
+            )
         }
 
         Log.i(TAG, "Loading model: ${modelFile.name} (${modelFile.length() / 1024 / 1024}MB)")
@@ -300,102 +260,82 @@ class GemmaTranslator(
             val assetManager = context.assets
             val modelsDir = assetManager.list("models") ?: emptyArray()
 
-            for (modelName in listOf(
-                "gemma-4-E2B-it.litertlm",
-                "gemma-4-E2B-it-web.task"
-            )) {
-                if (modelsDir.any { it == modelName }) {
-                    val targetFile = File(modelDir, modelName)
-                    _downloadState.value = DownloadState.Downloading
-                    assetManager.open("models/$modelName").use { input ->
-                        FileOutputStream(targetFile).use { output ->
-                            input.copyTo(output)
-                        }
+            if (!modelsDir.any { it == MODEL_FILENAME }) {
+                Log.d(TAG, "Model $MODEL_FILENAME not found in assets/models/")
+                return false
+            }
+
+            Log.i(TAG, "Copying bundled model from assets...")
+            _downloadState.value = DownloadState.Copying
+
+            assetManager.open("models/$MODEL_FILENAME").use { input ->
+                FileOutputStream(modelFile).use { output ->
+                    val buffer = ByteArray(1024 * 1024)
+                    var totalCopied = 0L
+                    var bytesRead: Int
+
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalCopied += bytesRead
                     }
-                    Log.i(TAG, "Model copied from assets/models/$modelName")
-                    return true
                 }
             }
-            false
+
+            Log.i(TAG, "Model copied: ${modelFile.length() / 1024 / 1024}MB")
+            true
         } catch (e: Exception) {
             Log.w(TAG, "Failed to copy model from assets: ${e.message}")
+            modelFile.delete()
             false
         }
     }
 
-    private fun copyFromSdcardIfNeeded(): Boolean {
-        // Try .litertlm first, then .task
-        val candidates = listOf(
-            primaryModelFile to externalModelFile,
-            webModelFile to File("/sdcard/translite_model.task")
-        )
+    private fun downloadFromHuggingFace(onProgress: (Int) -> Unit) {
+        val tmpFile = File(modelFile.path + ".tmp")
 
-        for ((target, source) in candidates) {
-            if (target.exists() && target.length() > 100_000_000) return true
-
-            if (source.exists() && source.length() > 100_000_000) {
-                return try {
-                    Log.i(TAG, "Copying model from ${source.absolutePath} to ${target.absolutePath}...")
-                    _downloadState.value = DownloadState.Downloading
-                    source.inputStream().use { input ->
-                        target.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    Log.i(TAG, "Model copied: ${target.length() / 1024 / 1024}MB")
-                    true
-                } catch (e: Exception) {
-                    Log.w(TAG, "Copy failed from ${source.absolutePath}: ${e.message}")
-                    false
-                }
-            }
-        }
-
-        return false
-    }
-
-    private fun downloadFromUrl(urlStr: String, targetFile: File, hfToken: String?) {
-        var connection: HttpURLConnection? = null
         try {
-            val url = URL(urlStr)
-            connection = url.openConnection() as HttpURLConnection
+            val url = URL(MODEL_URL)
+            val connection = url.openConnection() as HttpURLConnection
             connection.connectTimeout = 30_000
-            connection.readTimeout = 300_000  // 5 min for large models
+            connection.readTimeout = 600_000
             connection.requestMethod = "GET"
-
-            if (!hfToken.isNullOrBlank()) {
-                connection.setRequestProperty("Authorization", "Bearer $hfToken")
-            }
-
             connection.connect()
 
             val responseCode = connection.responseCode
             if (responseCode != 200) {
-                throw Exception("HTTP $responseCode")
+                throw Exception("HTTP $responseCode from HuggingFace")
             }
 
             val contentLength = connection.contentLength.toLong()
-            var downloaded = 0L
+            Log.i(TAG, "Downloading model from HuggingFace (${contentLength / 1024 / 1024}MB)...")
 
             connection.inputStream.use { input ->
-                FileOutputStream(targetFile).use { output ->
-                    val buffer = ByteArray(8192)
+                FileOutputStream(tmpFile).use { output ->
+                    val buffer = ByteArray(1024 * 1024)
+                    var totalDownloaded = 0L
                     var bytesRead: Int
+
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
-                        downloaded += bytesRead
+                        totalDownloaded += bytesRead
 
                         if (contentLength > 0) {
-                            val progress = (downloaded * 100 / contentLength).toInt()
-                            _downloadState.value = DownloadState.Progress(progress)
+                            val progress = (totalDownloaded * 100 / contentLength).toInt()
+                            onProgress(progress)
                         }
                     }
                 }
             }
 
-            Log.i(TAG, "Downloaded ${downloaded / 1024 / 1024}MB to ${targetFile.name}")
+            if (modelFile.exists()) modelFile.delete()
+            tmpFile.renameTo(modelFile)
+
+            Log.i(TAG, "Download complete: ${modelFile.length() / 1024 / 1024}MB")
+        } catch (e: Exception) {
+            tmpFile.delete()
+            throw e
         } finally {
-            connection?.disconnect()
+            tmpFile.delete()
         }
     }
 
@@ -403,7 +343,6 @@ class GemmaTranslator(
         val srcName = langName(sourceLang)
         val tgtName = langName(targetLang)
 
-        // Gemma 4 instruction format: <start_of_turn>user ... <start_of_turn>model
         return "<start_of_turn>user\nYou are a professional $srcName to $tgtName translator. Translate the following text accurately and concisely. Output ONLY the translation, nothing else.\n\n$text\n<start_of_turn>model\n"
     }
 
@@ -441,11 +380,10 @@ class GemmaTranslator(
 
     companion object {
         private const val TAG = "GemmaTranslator"
-    }
+        private const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
+        private const val MIN_MODEL_SIZE = 100_000_000L
 
-    private data class ModelInfo(
-        val file: File,
-        val url: String,
-        val name: String
-    )
+        private const val MODEL_URL =
+            "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
+    }
 }

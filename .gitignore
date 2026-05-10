@@ -21,3 +21,5 @@ Thumbs.db
 
 # Debug
 *.hprof
+*.litertlm
+*.task

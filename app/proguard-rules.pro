@@ -11,6 +11,10 @@
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
 
+# LiteRT-LM (Gemma 4) — JNI needs all Java methods intact for native calls
+-keep class com.google.ai.edge.litertlm.** { *; }
+-dontwarn com.google.ai.edge.litertlm.**
+
 # MediaPipe LLM - ignore missing javax.lang.model classes
 -dontwarn javax.lang.model.**
 -dontwarn autovalue.shaded.**

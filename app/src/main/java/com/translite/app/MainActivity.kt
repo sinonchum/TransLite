@@ -263,8 +263,10 @@ fun MainApp(
                 onLanguagePacks = { showLanguagePacks = true },
                 isOfflineMode = uiState.isOfflineMode,
                 onToggleOffline = { viewModel.toggleOfflineMode() },
+                isModelReady = uiState.isModelReady,
                 isModelDownloading = uiState.isModelDownloading,
                 downloadProgress = uiState.downloadProgress,
+                modelStatusText = uiState.modelStatusText,
                 onDownloadModel = { viewModel.downloadOfflineModel() },
                 modifier = Modifier.padding(padding)
             )

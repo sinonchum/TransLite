@@ -19,7 +19,10 @@ data class TranslationUiState(
     val error: String? = null,
     val languages: List<Language> = Language.entries.toList(),
     val isOfflineMode: Boolean = false,
+    // Model download/load state
+    val isModelReady: Boolean = false,
     val isModelDownloading: Boolean = false,
+    val modelStatusText: String = "",
     val downloadProgress: Int = 0
 )
 
@@ -39,28 +42,89 @@ class TranslationViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+        // Check if model already exists on startup
+        viewModelScope.launch {
+            val exists = offlineEngine.isModelDownloaded()
+            _uiState.update { it.copy(isModelReady = exists) }
+
+            // If model exists but engine not loaded, initialize it in background
+            if (exists) {
+                _uiState.update { it.copy(modelStatusText = "正在加载模型...") }
+                try {
+                    offlineEngine.ensureModelAvailable()
+                    _uiState.update {
+                        it.copy(isModelReady = true, modelStatusText = "模型已就绪")
+                    }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(modelStatusText = "模型加载失败: ${e.message}")
+                    }
+                }
+            }
+        }
+
         // Observe offline model download state
         viewModelScope.launch {
             offlineEngine.downloadState.collect { state ->
                 when (state) {
                     is GemmaTranslator.DownloadState.Downloading -> {
-                        _uiState.update { it.copy(isModelDownloading = true, downloadProgress = 0) }
+                        _uiState.update {
+                            it.copy(
+                                isModelDownloading = true,
+                                modelStatusText = "正在下载模型...",
+                                downloadProgress = 0
+                            )
+                        }
                     }
                     is GemmaTranslator.DownloadState.Progress -> {
-                        _uiState.update { it.copy(downloadProgress = state.percent) }
+                        _uiState.update {
+                            it.copy(
+                                downloadProgress = state.percent,
+                                modelStatusText = "下载中... ${state.percent}%"
+                            )
+                        }
+                    }
+                    is GemmaTranslator.DownloadState.Copying -> {
+                        _uiState.update {
+                            it.copy(
+                                isModelDownloading = true,
+                                modelStatusText = "正在从安装包解压模型...",
+                                downloadProgress = 0
+                            )
+                        }
+                    }
+                    is GemmaTranslator.DownloadState.Loading -> {
+                        _uiState.update {
+                            it.copy(
+                                isModelDownloading = true,
+                                modelStatusText = "下载完成，正在加载模型...",
+                                downloadProgress = 100
+                            )
+                        }
                     }
                     is GemmaTranslator.DownloadState.Ready -> {
-                        _uiState.update { it.copy(isModelDownloading = false, isOfflineMode = true) }
+                        _uiState.update {
+                            it.copy(
+                                isModelReady = true,
+                                isModelDownloading = false,
+                                isOfflineMode = true,
+                                modelStatusText = "模型已就绪 ✓",
+                                downloadProgress = 100
+                            )
+                        }
                     }
                     is GemmaTranslator.DownloadState.Error -> {
                         _uiState.update {
                             it.copy(
                                 isModelDownloading = false,
+                                modelStatusText = "",
                                 error = state.message
                             )
                         }
                     }
-                    else -> {}
+                    is GemmaTranslator.DownloadState.Idle -> {
+                        // Don't reset status text here — keep showing last state
+                    }
                 }
             }
         }
@@ -113,7 +177,6 @@ class TranslationViewModel(
 
             val sourceLang = if (state.sourceLang == Language.AUTO) Language.ENGLISH else state.sourceLang
 
-            // Use offline engine if available and enabled
             val result = if (state.isOfflineMode) {
                 offlineEngine.translate(state.inputText, sourceLang, state.targetLang)
             } else {

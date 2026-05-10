@@ -1,0 +1,110 @@
+<resources>
+    <string name="app_name">TransLite</string>
+    <string name="app_title">TransLite</string>
+    <string name="input_hint">输入要翻译的文本...</string>
+    <string name="translate">翻译</string>
+    <string name="swap_languages">交换语言</string>
+    <string name="clear">清除</string>
+    <string name="select_language">选择语言</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="copy">复制</string>
+    <string name="download">下载</string>
+    <string name="language_name_format">%1$s (%2$s)</string>
+    <string name="settings">设置</string>
+    <string name="history">历史记录</string>
+    <string name="about">关于</string>
+    <string name="enabled">已开启</string>
+    <string name="disabled">关闭</string>
+    <string name="back">返回</string>
+    <string name="processing">处理中...</string>
+    <string name="favorite">收藏</string>
+
+    <!-- 离线模型 -->
+    <string name="offline_translation_model">离线翻译模型</string>
+    <string name="model_info">Gemma 4 E2B (约 2.5GB)</string>
+    <string name="use_offline_model">使用离线模型</string>
+    <string name="using_offline">当前使用离线翻译</string>
+    <string name="using_online">当前使用在线翻译</string>
+    <string name="download_progress_percent">%d%%</string>
+    <string name="download_mb_format">%1$dMB / %2$dMB</string>
+    <string name="download_speed">速度: %1$.1f MB/s</string>
+    <string name="download_offline_model">下载离线模型 (~2.5GB)</string>
+    <string name="download_wifi_hint">首次使用需下载模型，建议在 Wi-Fi 下进行</string>
+    <string name="loading_model">正在加载模型...</string>
+    <string name="model_ready">模型已就绪</string>
+    <string name="model_load_failed">模型加载失败: %1$s</string>
+    <string name="downloading_model">正在下载模型...</string>
+    <string name="downloading_percent">下载中... %1$d%%</string>
+    <string name="extracting_model">正在从安装包解压模型...</string>
+    <string name="download_complete_loading">下载完成，正在加载模型...</string>
+    <string name="model_ready_checkmark">模型已就绪 ✓</string>
+    <string name="translation_failed">翻译失败</string>
+
+    <!-- 设置 -->
+    <string name="floating_translate">悬浮球翻译</string>
+    <string name="overlay_permission">悬浮窗权限</string>
+    <string name="manage_overlay_permission">管理应用悬浮窗权限</string>
+    <string name="language_pack_management">语言包管理</string>
+    <string name="language_pack_desc">下载和管理离线翻译语言包</string>
+    <string name="language_setting">语言设置</string>
+    <string name="follow_system">跟随系统</string>
+    <string name="app_version">TransLite v2.1.0</string>
+
+    <!-- 拍照 -->
+    <string name="camera_translate">拍照翻译</string>
+    <string name="no_text_recognized">未识别到文字</string>
+    <string name="take_photo">拍照</string>
+
+    <!-- 语言包 -->
+    <string name="download_count_format">%1$d/%2$d 已下载</string>
+    <string name="auto_download_hint">首次翻译某语言时会自动下载语言包（约30-50MB）。</string>
+    <string name="delete_language_pack">删除语言包</string>
+    <string name="confirm_delete_lang">确定要删除 %1$s 语言包吗？删除后需要重新下载才能离线翻译。</string>
+    <string name="downloaded_checkmark">已下载 ✓</string>
+    <string name="downloading_progress">下载中... %d%%</string>
+    <string name="not_downloaded">未下载</string>
+
+    <!-- 对话翻译 -->
+    <string name="conversation_translate">对话翻译</string>
+    <string name="voice_input_hint">点击麦克风按钮开始语音输入，识别后自动翻译</string>
+    <string name="recognized_text">识别文本</string>
+    <string name="waiting_voice_input">等待语音输入...</string>
+    <string name="translation_result">翻译结果</string>
+    <string name="stop_recording">停止</string>
+    <string name="start_recording">开始录音</string>
+    <string name="listening">正在聆听...</string>
+
+    <!-- 历史记录 -->
+    <string name="history_count">历史记录 (%1$d)</string>
+    <string name="clear_all">清空</string>
+    <string name="no_history">暂无翻译记录</string>
+    <string name="history_auto_save">翻译结果会自动保存到这里</string>
+    <string name="clear_history">清空历史记录</string>
+    <string name="confirm_clear_history">确定要清空所有翻译历史吗？此操作不可撤销。</string>
+
+    <!-- 屏幕翻译及其他 -->
+    <string name="screen_translate">屏幕翻译</string>
+    <string name="switch_to_online">切换在线</string>
+    <string name="switch_to_offline">切换离线</string>
+    <string name="tab_translate">翻译</string>
+    <string name="tab_conversation">对话</string>
+    <string name="tab_history">历史</string>
+    <string name="tab_settings">设置</string>
+
+    <!-- Toast 消息 -->
+    <string name="permission_denied">部分权限未授予: %1$s</string>
+    <string name="screen_capture_service_failed">屏幕截图服务启动失败: %1$s</string>
+    <string name="screen_capture_permission_failed">屏幕截图权限请求失败: %1$s</string>
+    <!-- 翻译模式 -->
+    <string name="translation_mode">翻译模式</string>
+    <string name="mode_standard_desc">日常快速翻译</string>
+    <string name="mode_academic_desc">深度分析，含语法拆解和核心词汇</string>
+    <string name="mode_academic_not_downloaded">Phi-4 模型未下载</string>
+    <string name="switching_model">正在切换模型…</string>
+    <!-- 剪贴板监听 -->
+    <string name="clipboard_monitor_active">剪贴板翻译已激活</string>
+    <string name="clipboard_monitor">剪贴板监听</string>
+    <string name="clipboard_monitor_desc">复制外语时自动翻译</string>
+    <string name="download_phi4_model">下载 Phi-4 模型 (~3.7GB)</string>
+</resources>

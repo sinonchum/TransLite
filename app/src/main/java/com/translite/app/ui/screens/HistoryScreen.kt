@@ -9,8 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.translite.app.R
 import com.translite.app.data.db.entity.TranslationEntity
 import com.translite.app.domain.model.Language
 import java.text.SimpleDateFormat
@@ -35,14 +37,14 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "历史记录 (${history.size})",
+                text = stringResource(R.string.history_count, history.size),
                 style = MaterialTheme.typography.titleMedium
             )
             if (history.isNotEmpty()) {
                 TextButton(onClick = { showClearDialog = true }) {
                     Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("清空")
+                    Text(stringResource(R.string.clear_all))
                 }
             }
         }
@@ -60,8 +62,8 @@ fun HistoryScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text("暂无翻译记录", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("翻译结果会自动保存到这里", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    Text(stringResource(R.string.no_history), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.history_auto_save), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                 }
             }
         } else {
@@ -84,16 +86,16 @@ fun HistoryScreen(
     if (showClearDialog) {
         AlertDialog(
             onDismissRequest = { showClearDialog = false },
-            title = { Text("清空历史记录") },
-            text = { Text("确定要清空所有翻译历史吗？此操作不可撤销。") },
+            title = { Text(stringResource(R.string.clear_history)) },
+            text = { Text(stringResource(R.string.confirm_clear_history)) },
             confirmButton = {
                 TextButton(onClick = {
                     onClearAll()
                     showClearDialog = false
-                }) { Text("清空", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.clear_all), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) { Text("取消") }
+                TextButton(onClick = { showClearDialog = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -157,7 +159,7 @@ fun HistoryItem(
                 IconButton(onClick = onToggleFavorite, modifier = Modifier.size(32.dp)) {
                     Icon(
                         if (entity.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "收藏",
+                        contentDescription = stringResource(R.string.favorite),
                         tint = if (entity.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
@@ -165,7 +167,7 @@ fun HistoryItem(
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "删除",
+                        contentDescription = stringResource(R.string.delete),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )

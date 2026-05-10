@@ -1,0 +1,110 @@
+<resources>
+    <string name="app_name">TransLite</string>
+    <string name="app_title">TransLite</string>
+    <string name="input_hint">Text zur Übersetzung eingeben…</string>
+    <string name="translate">Übersetzen</string>
+    <string name="swap_languages">Sprachen tauschen</string>
+    <string name="clear">Löschen</string>
+    <string name="select_language">Sprache auswählen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="delete">Löschen</string>
+    <string name="copy">Kopieren</string>
+    <string name="download">Herunterladen</string>
+    <string name="language_name_format">%1$s (%2$s)</string>
+    <string name="settings">Einstellungen</string>
+    <string name="history">Verlauf</string>
+    <string name="about">Über</string>
+    <string name="enabled">Aktiviert</string>
+    <string name="disabled">Deaktiviert</string>
+    <string name="back">Zurück</string>
+    <string name="processing">Verarbeitung…</string>
+    <string name="favorite">Favorit</string>
+
+    <!-- Offline Model -->
+    <string name="offline_translation_model">Offline-Übersetzungsmodell</string>
+    <string name="model_info">Gemma 4 E2B (~2.5GB)</string>
+    <string name="use_offline_model">Offline-Modell verwenden</string>
+    <string name="using_offline">Aktuell wird die Offline-Übersetzung verwendet</string>
+    <string name="using_online">Aktuell wird die Online-Übersetzung verwendet</string>
+    <string name="download_progress_percent">%d%%</string>
+    <string name="download_mb_format">%1$dMB / %2$dMB</string>
+    <string name="download_speed">Geschwindigkeit: %1$.1f MB/s</string>
+    <string name="download_offline_model">Offline-Modell herunterladen (~2.5GB)</string>
+    <string name="download_wifi_hint">Die erste Verwendung erfordert einen Modell-Download, Wi-Fi empfohlen</string>
+    <string name="loading_model">Modell wird geladen…</string>
+    <string name="model_ready">Modell bereit</string>
+    <string name="model_load_failed">Modell konnte nicht geladen werden: %1$s</string>
+    <string name="downloading_model">Modell wird heruntergeladen…</string>
+    <string name="downloading_percent">Download… %1$d%%</string>
+    <string name="extracting_model">Modell wird aus dem Paket extrahiert…</string>
+    <string name="download_complete_loading">Download abgeschlossen, Modell wird geladen…</string>
+    <string name="model_ready_checkmark">Modell bereit ✓</string>
+    <string name="translation_failed">Übersetzung fehlgeschlagen</string>
+
+    <!-- Settings -->
+    <string name="floating_translate">Schwebende Kugel-Übersetzung</string>
+    <string name="overlay_permission">Überlagerungsberechtigung</string>
+    <string name="manage_overlay_permission">App-Überlagerungsberechtigung verwalten</string>
+    <string name="language_pack_management">Sprachpaket-Verwaltung</string>
+    <string name="language_pack_desc">Offline-Übersetzungssprachpakete herunterladen und verwalten</string>
+    <string name="language_setting">Sprache</string>
+    <string name="follow_system">Systemstandard</string>
+    <string name="app_version">TransLite v2.1.0</string>
+
+    <!-- Camera -->
+    <string name="camera_translate">Kamera-Übersetzung</string>
+    <string name="no_text_recognized">Kein Text erkannt</string>
+    <string name="take_photo">Foto aufnehmen</string>
+
+    <!-- Language Packs -->
+    <string name="download_count_format">%1$d/%2$d heruntergeladen</string>
+    <string name="auto_download_hint">Das Sprachpakat wird beim ersten Übersetzen einer Sprache automatisch heruntergeladen (~30-50MB).</string>
+    <string name="delete_language_pack">Sprachpaket löschen</string>
+    <string name="confirm_delete_lang">Möchten Sie das Sprachpaket %1$s wirklich löschen? Sie müssen es für die Offline-Übersetzung erneut herunterladen.</string>
+    <string name="downloaded_checkmark">Heruntergeladen ✓</string>
+    <string name="downloading_progress">Download… %d%%</string>
+    <string name="not_downloaded">Nicht heruntergeladen</string>
+
+    <!-- Conversation -->
+    <string name="conversation_translate">Sprachunterhaltungs-Übersetzung</string>
+    <string name="voice_input_hint">Tippen Sie auf die Mikrofontaste, um die Spracheingabe zu starten. Übersetzung erfolgt automatisch nach der Erkennung</string>
+    <string name="recognized_text">Erkannter Text</string>
+    <string name="waiting_voice_input">Warte auf Spracheingabe…</string>
+    <string name="translation_result">Übersetzungsergebnis</string>
+    <string name="stop_recording">Aufnahme stoppen</string>
+    <string name="start_recording">Aufnahme starten</string>
+    <string name="listening">Zuhören…</string>
+
+    <!-- History -->
+    <string name="history_count">Verlauf (%1$d)</string>
+    <string name="clear_all">Alles löschen</string>
+    <string name="no_history">Kein Übersetzungsverlauf</string>
+    <string name="history_auto_save">Übersetzungsergebnisse werden hier automatisch gespeichert</string>
+    <string name="clear_history">Verlauf löschen</string>
+    <string name="confirm_clear_history">Möchten Sie den gesamten Übersetzungsverlauf wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</string>
+
+    <!-- Screen translate & misc -->
+    <string name="screen_translate">Bildschirm-Übersetzung</string>
+    <string name="switch_to_online">Zum Online-Modus wechseln</string>
+    <string name="switch_to_offline">Zum Offline-Modus wechseln</string>
+    <string name="tab_translate">Übersetzen</string>
+    <string name="tab_conversation">Unterhaltung</string>
+    <string name="tab_history">Verlauf</string>
+    <string name="tab_settings">Einstellungen</string>
+
+    <!-- Toast messages -->
+    <string name="permission_denied">Einige Berechtigungen wurden nicht erteilt: %1$s</string>
+    <string name="screen_capture_service_failed">Der Bildschirmaufnahmedienst konnte nicht gestartet werden: %1$s</string>
+    <string name="screen_capture_permission_failed">Die Anfrage für die Bildschirmaufnahmeberechtigung ist fehlgeschlagen: %1$s</string>
+    <!-- Translation Mode -->
+    <string name="translation_mode">Übersetzungsmodus</string>
+    <string name="mode_standard_desc">Schnelle Übersetzung für den täglichen Gebrauch</string>
+    <string name="mode_academic_desc">Tiefgehende Analyse mit Grammatik &amp; Wortschatz</string>
+    <string name="mode_academic_not_downloaded">Phi-4-Modell nicht heruntergeladen</string>
+    <string name="switching_model">Modell wird gewechselt…</string>
+    <!-- Clipboard Monitor -->
+    <string name="clipboard_monitor_active">Zwischenablagen-Übersetzung aktiv</string>
+    <string name="clipboard_monitor">Zwischenablagen-Überwachung</string>
+    <string name="clipboard_monitor_desc">Fremdsprachigen Text bei Kopierung übersetzen</string>
+    <string name="download_phi4_model">Phi-4-Modell herunterladen (~3,7 GB)</string>
+</resources>

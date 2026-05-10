@@ -3,8 +3,11 @@ package com.translite.app
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import com.translite.app.domain.engine.EngineRouter
 import com.translite.app.domain.engine.GemmaTranslator
+import com.translite.app.domain.engine.ModelManager
 import com.translite.app.domain.engine.OnlineTranslator
+import com.translite.app.domain.engine.Phi4Translator
 
 class TransLiteApp : Application() {
 
@@ -12,6 +15,15 @@ class TransLiteApp : Application() {
         private set
 
     lateinit var offlineEngine: GemmaTranslator
+        private set
+
+    lateinit var modelManager: ModelManager
+        private set
+
+    lateinit var phi4Engine: Phi4Translator
+        private set
+
+    lateinit var engineRouter: EngineRouter
         private set
 
     var useOffline: Boolean = false
@@ -23,15 +35,14 @@ class TransLiteApp : Application() {
                 .apply()
         }
 
-    val activeEngine: Any
-        get() = if (useOffline) offlineEngine else onlineEngine
-
     override fun onCreate() {
         super.onCreate()
         onlineEngine = OnlineTranslator()
+        modelManager = ModelManager(this)
         offlineEngine = GemmaTranslator(this)
+        phi4Engine = Phi4Translator(this, modelManager)
+        engineRouter = EngineRouter(offlineEngine, phi4Engine)
 
-        // Restore offline preference
         useOffline = getSharedPreferences("translite_prefs", MODE_PRIVATE)
             .getBoolean("use_offline", false)
 
@@ -40,7 +51,7 @@ class TransLiteApp : Application() {
 
     override fun onTerminate() {
         onlineEngine.close()
-        offlineEngine.close()
+        engineRouter.close()
         super.onTerminate()
     }
 

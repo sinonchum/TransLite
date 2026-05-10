@@ -12,5 +12,6 @@ data class TranslationResult(
     val sourceLang: Language,
     val targetLang: Language,
     val timestamp: Long = System.currentTimeMillis(),
-    val isOffline: Boolean = true
+    val isOffline: Boolean = true,
+    val analysisData: String? = null  // JSON string for academic mode results
 )

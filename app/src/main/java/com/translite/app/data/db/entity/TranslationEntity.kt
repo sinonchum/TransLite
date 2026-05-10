@@ -1,5 +1,6 @@
 package com.translite.app.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -12,5 +13,7 @@ data class TranslationEntity(
     val targetLangCode: String,
     val timestamp: Long = System.currentTimeMillis(),
     val isFavorite: Boolean = false,
-    val isOffline: Boolean = true
+    val isOffline: Boolean = true,
+    val mode: String = "standard",
+    @ColumnInfo(defaultValue = "NULL") val analysisData: String? = null
 )

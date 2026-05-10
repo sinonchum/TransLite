@@ -13,8 +13,8 @@ android {
         applicationId = "com.translite.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.0.0"
+        versionCode = 9
+        versionName = "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -78,6 +78,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Core
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")

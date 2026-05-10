@@ -9,7 +9,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.translite.app.R
 import com.translite.app.domain.model.Language
 import com.translite.app.ui.components.TranslationInput
 import com.translite.app.ui.components.TranslationResultCard
@@ -46,18 +49,18 @@ fun HomeScreen(
             FilterChip(
                 selected = true,
                 onClick = { showSourceLangPicker = true },
-                label = { Text(uiState.sourceLang.displayName) },
+                label = { Text(uiState.sourceLang.getDisplayName(LocalContext.current)) },
                 leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) }
             )
 
             IconButton(onClick = onSwapLanguages) {
-                Icon(Icons.Default.SwapHoriz, contentDescription = "交换语言")
+                Icon(Icons.Default.SwapHoriz, contentDescription = stringResource(R.string.swap_languages))
             }
 
             FilterChip(
                 selected = true,
                 onClick = { showTargetLangPicker = true },
-                label = { Text(uiState.targetLang.displayName) },
+                label = { Text(uiState.targetLang.getDisplayName(LocalContext.current)) },
                 leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) }
             )
         }
@@ -66,7 +69,7 @@ fun HomeScreen(
         TranslationInput(
             text = uiState.inputText,
             onTextChange = onInputChange,
-            hint = "输入要翻译的文本...",
+            hint = stringResource(R.string.input_hint),
             modifier = Modifier.weight(1f, fill = false)
         )
 
@@ -76,7 +79,7 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             IconButton(onClick = onClear) {
-                Icon(Icons.Default.Clear, contentDescription = "清除")
+                Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.clear))
             }
 
             Button(
@@ -91,7 +94,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                 }
-                Text("翻译")
+                Text(stringResource(R.string.translate))
             }
         }
 
@@ -147,7 +150,7 @@ fun LanguagePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择语言") },
+        title = { Text(stringResource(R.string.select_language)) },
         text = {
             Column {
                 languages.forEach { lang ->
@@ -155,13 +158,13 @@ fun LanguagePickerDialog(
                         onClick = { onSelect(lang) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("${lang.displayName} (${lang.displayNameEn})")
+                        Text(stringResource(R.string.language_name_format, lang.getDisplayName(LocalContext.current), lang.displayNameEn))
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

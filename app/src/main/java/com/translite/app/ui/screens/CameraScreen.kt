@@ -22,9 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.translite.app.R
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
@@ -49,10 +51,10 @@ fun CameraScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("拍照翻译") },
+                title = { Text(stringResource(R.string.camera_translate)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -109,7 +111,7 @@ fun CameraScreen(
                             if (text.isNotBlank()) {
                                 onTextRecognized(text)
                             } else {
-                                Toast.makeText(context, "未识别到文字", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.no_text_recognized), Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
@@ -128,7 +130,7 @@ fun CameraScreen(
                 } else {
                     Icon(
                         Icons.Default.CameraAlt,
-                        contentDescription = "拍照",
+                        contentDescription = stringResource(R.string.take_photo),
                         modifier = Modifier.size(32.dp)
                     )
                 }

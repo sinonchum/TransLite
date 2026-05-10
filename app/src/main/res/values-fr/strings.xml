@@ -1,0 +1,110 @@
+<resources>
+    <string name="app_name">TransLite</string>
+    <string name="app_title">TransLite</string>
+    <string name="input_hint">Entrez du texte à traduire…</string>
+    <string name="translate">Traduire</string>
+    <string name="swap_languages">Inverser les langues</string>
+    <string name="clear">Effacer</string>
+    <string name="select_language">Sélectionner la langue</string>
+    <string name="cancel">Annuler</string>
+    <string name="delete">Supprimer</string>
+    <string name="copy">Copier</string>
+    <string name="download">Télécharger</string>
+    <string name="language_name_format">%1$s (%2$s)</string>
+    <string name="settings">Paramètres</string>
+    <string name="history">Historique</string>
+    <string name="about">À propos</string>
+    <string name="enabled">Activé</string>
+    <string name="disabled">Désactivé</string>
+    <string name="back">Retour</string>
+    <string name="processing">Traitement…</string>
+    <string name="favorite">Favori</string>
+
+    <!-- Offline Model -->
+    <string name="offline_translation_model">Modèle de traduction hors ligne</string>
+    <string name="model_info">Gemma 4 E2B (~2.5GB)</string>
+    <string name="use_offline_model">Utiliser le modèle hors ligne</string>
+    <string name="using_offline">Traduction hors ligne en cours</string>
+    <string name="using_online">Traduction en ligne en cours</string>
+    <string name="download_progress_percent">%d%%</string>
+    <string name="download_mb_format">%1$dMB / %2$dMB</string>
+    <string name="download_speed">Vitesse : %1$.1f Mo/s</string>
+    <string name="download_offline_model">Télécharger le modèle hors ligne (~2.5GB)</string>
+    <string name="download_wifi_hint">Première utilisation nécessite le téléchargement du modèle, Wi-Fi recommandé</string>
+    <string name="loading_model">Chargement du modèle…</string>
+    <string name="model_ready">Modèle prêt</string>
+    <string name="model_load_failed">Échec du chargement du modèle : %1$s</string>
+    <string name="downloading_model">Téléchargement du modèle…</string>
+    <string name="downloading_percent">Téléchargement… %1$d%%</string>
+    <string name="extracting_model">Extraction du modèle depuis le paquet…</string>
+    <string name="download_complete_loading">Téléchargement terminé, chargement du modèle…</string>
+    <string name="model_ready_checkmark">Modèle prêt ✓</string>
+    <string name="translation_failed">Échec de la traduction</string>
+
+    <!-- Settings -->
+    <string name="floating_translate">Traduction par bulle flottante</string>
+    <string name="overlay_permission">Permission de superposition</string>
+    <string name="manage_overlay_permission">Gérer la permission de superposition de l\'application</string>
+    <string name="language_pack_management">Gestion des packs de langue</string>
+    <string name="language_pack_desc">Télécharger et gérer les packs de langue de traduction hors ligne</string>
+    <string name="language_setting">Langue</string>
+    <string name="follow_system">Par défaut du système</string>
+    <string name="app_version">TransLite v2.1.0</string>
+
+    <!-- Camera -->
+    <string name="camera_translate">Traduction par caméra</string>
+    <string name="no_text_recognized">Aucun texte reconnu</string>
+    <string name="take_photo">Prendre une photo</string>
+
+    <!-- Language Packs -->
+    <string name="download_count_format">%1$d/%2$d téléchargé(s)</string>
+    <string name="auto_download_hint">Le pack de langue se télécharge automatiquement lors de la première traduction d\'une langue (~30-50Mo).</string>
+    <string name="delete_language_pack">Supprimer le pack de langue</string>
+    <string name="confirm_delete_lang">Êtes-vous sûr(e) de vouloir supprimer le pack de langue %1$s ? Vous devrez le re-télécharger pour la traduction hors ligne.</string>
+    <string name="downloaded_checkmark">Téléchargé ✓</string>
+    <string name="downloading_progress">Téléchargement… %d%%</string>
+    <string name="not_downloaded">Non téléchargé</string>
+
+    <!-- Conversation -->
+    <string name="conversation_translate">Traduction conversationnelle</string>
+    <string name="voice_input_hint">Appuyez sur le bouton micro pour démarrer la saisie vocale, traduction automatique après la reconnaissance</string>
+    <string name="recognized_text">Texte reconnu</string>
+    <string name="waiting_voice_input">En attente de saisie vocale…</string>
+    <string name="translation_result">Résultat de la traduction</string>
+    <string name="stop_recording">Arrêter l\'enregistrement</string>
+    <string name="start_recording">Démarrer l\'enregistrement</string>
+    <string name="listening">Écoute…</string>
+
+    <!-- History -->
+    <string name="history_count">Historique (%1$d)</string>
+    <string name="clear_all">Tout effacer</string>
+    <string name="no_history">Aucun historique de traduction</string>
+    <string name="history_auto_save">Les résultats de traduction sont automatiquement enregistrés ici</string>
+    <string name="clear_history">Effacer l\'historique</string>
+    <string name="confirm_clear_history">Êtes-vous sûr(e) de vouloir effacer tout l\'historique de traduction ? Cette action est irréversible.</string>
+
+    <!-- Screen translate & misc -->
+    <string name="screen_translate">Traduction de l\'écran</string>
+    <string name="switch_to_online">Passer en ligne</string>
+    <string name="switch_to_offline">Passer hors ligne</string>
+    <string name="tab_translate">Traduire</string>
+    <string name="tab_conversation">Conversation</string>
+    <string name="tab_history">Historique</string>
+    <string name="tab_settings">Paramètres</string>
+
+    <!-- Toast messages -->
+    <string name="permission_denied">Certaines permissions n\'ont pas été accordées : %1$s</string>
+    <string name="screen_capture_service_failed">Le service de capture d\'écran n\'a pas pu démarrer : %1$s</string>
+    <string name="screen_capture_permission_failed">La demande de permission de capture d\'écran a échoué : %1$s</string>
+    <!-- Translation Mode -->
+    <string name="translation_mode">Mode de traduction</string>
+    <string name="mode_standard_desc">Traduction rapide pour un usage quotidien</string>
+    <string name="mode_academic_desc">Analyse approfondie avec grammaire &amp; vocabulaire</string>
+    <string name="mode_academic_not_downloaded">Modèle Phi-4 non téléchargé</string>
+    <string name="switching_model">Changement de modèle…</string>
+    <!-- Clipboard Monitor -->
+    <string name="clipboard_monitor_active">Traduction du presse-papiers active</string>
+    <string name="clipboard_monitor">Moniteur du presse-papiers</string>
+    <string name="clipboard_monitor_desc">Traduire le texte étranger lorsqu\'il est copié</string>
+    <string name="download_phi4_model">Télécharger le modèle Phi-4 (~3,7 Go)</string>
+</resources>

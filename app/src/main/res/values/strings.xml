@@ -1,14 +1,110 @@
 <resources>
     <string name="app_name">TransLite</string>
-    <string name="input_hint">输入要翻译的文本...</string>
-    <string name="translate">翻译</string>
-    <string name="source_lang">源语言</string>
-    <string name="target_lang">目标语言</string>
-    <string name="history">历史记录</string>
-    <string name="settings">设置</string>
-    <string name="download_lang">下载语言包</string>
-    <string name="downloading">下载中...</string>
-    <string name="download_complete">下载完成</string>
-    <string name="copy_result">复制结果</string>
-    <string name="clear">清除</string>
+    <string name="app_title">TransLite</string>
+    <string name="input_hint">Enter text to translate…</string>
+    <string name="translate">Translate</string>
+    <string name="swap_languages">Swap languages</string>
+    <string name="clear">Clear</string>
+    <string name="select_language">Select language</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="copy">Copy</string>
+    <string name="download">Download</string>
+    <string name="language_name_format">%1$s (%2$s)</string>
+    <string name="settings">Settings</string>
+    <string name="history">History</string>
+    <string name="about">About</string>
+    <string name="enabled">Enabled</string>
+    <string name="disabled">Disabled</string>
+    <string name="back">Back</string>
+    <string name="processing">Processing…</string>
+    <string name="favorite">Favorite</string>
+
+    <!-- Offline Model -->
+    <string name="offline_translation_model">Offline translation model</string>
+    <string name="model_info">Gemma 4 E2B (~2.5GB)</string>
+    <string name="use_offline_model">Use offline model</string>
+    <string name="using_offline">Currently using offline translation</string>
+    <string name="using_online">Currently using online translation</string>
+    <string name="download_progress_percent">%d%%</string>
+    <string name="download_mb_format">%1$dMB / %2$dMB</string>
+    <string name="download_speed">Speed: %1$.1f MB/s</string>
+    <string name="download_offline_model">Download offline model (~2.5GB)</string>
+    <string name="download_wifi_hint">First use requires model download, Wi-Fi recommended</string>
+    <string name="loading_model">Loading model…</string>
+    <string name="model_ready">Model ready</string>
+    <string name="model_load_failed">Model load failed: %1$s</string>
+    <string name="downloading_model">Downloading model…</string>
+    <string name="downloading_percent">Downloading… %1$d%%</string>
+    <string name="extracting_model">Extracting model from package…</string>
+    <string name="download_complete_loading">Download complete, loading model…</string>
+    <string name="model_ready_checkmark">Model ready ✓</string>
+    <string name="translation_failed">Translation failed</string>
+
+    <!-- Settings -->
+    <string name="floating_translate">Floating ball translate</string>
+    <string name="overlay_permission">Overlay permission</string>
+    <string name="manage_overlay_permission">Manage app overlay permission</string>
+    <string name="language_pack_management">Language pack management</string>
+    <string name="language_pack_desc">Download and manage offline translation language packs</string>
+    <string name="language_setting">Language</string>
+    <string name="follow_system">System Default</string>
+    <string name="app_version">TransLite v2.1.0</string>
+
+    <!-- Camera -->
+    <string name="camera_translate">Camera translate</string>
+    <string name="no_text_recognized">No text recognized</string>
+    <string name="take_photo">Take photo</string>
+
+    <!-- Language Packs -->
+    <string name="download_count_format">%1$d/%2$d downloaded</string>
+    <string name="auto_download_hint">Language pack auto-downloads when translating a language for the first time (~30-50MB).</string>
+    <string name="delete_language_pack">Delete language pack</string>
+    <string name="confirm_delete_lang">Are you sure you want to delete %1$s language pack? You\'ll need to re-download for offline translation.</string>
+    <string name="downloaded_checkmark">Downloaded ✓</string>
+    <string name="downloading_progress">Downloading… %d%%</string>
+    <string name="not_downloaded">Not downloaded</string>
+
+    <!-- Conversation -->
+    <string name="conversation_translate">Conversation translate</string>
+    <string name="voice_input_hint">Tap mic button to start voice input, auto-translate after recognition</string>
+    <string name="recognized_text">Recognized text</string>
+    <string name="waiting_voice_input">Waiting for voice input…</string>
+    <string name="translation_result">Translation result</string>
+    <string name="stop_recording">Stop recording</string>
+    <string name="start_recording">Start recording</string>
+    <string name="listening">Listening…</string>
+
+    <!-- History -->
+    <string name="history_count">History (%1$d)</string>
+    <string name="clear_all">Clear all</string>
+    <string name="no_history">No translation history</string>
+    <string name="history_auto_save">Translation results are automatically saved here</string>
+    <string name="clear_history">Clear history</string>
+    <string name="confirm_clear_history">Are you sure you want to clear all translation history? This cannot be undone.</string>
+
+    <!-- Screen translate & misc -->
+    <string name="screen_translate">Screen translate</string>
+    <string name="switch_to_online">Switch to online</string>
+    <string name="switch_to_offline">Switch to offline</string>
+    <string name="tab_translate">Translate</string>
+    <string name="tab_conversation">Conversation</string>
+    <string name="tab_history">History</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- Toast messages -->
+    <string name="permission_denied">Some permissions not granted: %1$s</string>
+    <string name="screen_capture_service_failed">Screen capture service failed to start: %1$s</string>
+    <string name="screen_capture_permission_failed">Screen capture permission request failed: %1$s</string>
+    <!-- Translation Mode -->
+    <string name="translation_mode">Translation Mode</string>
+    <string name="mode_standard_desc">Fast translation for daily use</string>
+    <string name="mode_academic_desc">Deep analysis with grammar &amp; vocabulary</string>
+    <string name="mode_academic_not_downloaded">Phi-4 model not downloaded</string>
+    <string name="switching_model">Switching model…</string>
+    <!-- Clipboard Monitor -->
+    <string name="clipboard_monitor_active">Clipboard translation active</string>
+    <string name="clipboard_monitor">Clipboard Monitor</string>
+    <string name="clipboard_monitor_desc">Translate foreign text when copied</string>
+    <string name="download_phi4_model">Download Phi-4 model (~3.7GB)</string>
 </resources>

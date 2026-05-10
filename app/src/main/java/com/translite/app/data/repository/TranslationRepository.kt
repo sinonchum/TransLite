@@ -45,5 +45,7 @@ class TranslationRepository(
 
     suspend fun clearHistory() = dao.deleteAll()
 
+    suspend fun saveTranslation(entity: TranslationEntity) = dao.insert(entity)
+
     fun searchHistory(query: String): Flow<List<TranslationEntity>> = dao.search(query)
 }

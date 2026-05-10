@@ -13,8 +13,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.translite.app.R
 import com.translite.app.domain.model.Language
 import com.translite.app.ui.viewmodel.TranslationUiState
 import com.translite.app.ui.viewmodel.TranslationViewModel
@@ -57,14 +60,14 @@ fun ConversationScreen(
     ) {
         // Title
         Text(
-            text = "对话翻译",
+            text = stringResource(R.string.conversation_translate),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
 
         Text(
-            text = "点击麦克风按钮开始语音输入，识别后自动翻译",
+            text = stringResource(R.string.voice_input_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center
@@ -80,13 +83,13 @@ fun ConversationScreen(
             FilterChip(
                 selected = true,
                 onClick = { },
-                label = { Text(uiState.sourceLang.displayName) }
+                label = { Text(uiState.sourceLang.getDisplayName(LocalContext.current)) }
             )
             Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, modifier = Modifier.align(Alignment.CenterVertically))
             FilterChip(
                 selected = true,
                 onClick = { },
-                label = { Text(uiState.targetLang.displayName) }
+                label = { Text(uiState.targetLang.getDisplayName(LocalContext.current)) }
             )
         }
 
@@ -101,13 +104,13 @@ fun ConversationScreen(
                 modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "识别文本",
+                    text = stringResource(R.string.recognized_text),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = if (recognizedText.isNotBlank()) recognizedText else "等待语音输入...",
+                    text = if (recognizedText.isNotBlank()) recognizedText else stringResource(R.string.waiting_voice_input),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (recognizedText.isNotBlank())
                         MaterialTheme.colorScheme.onSurface
@@ -127,7 +130,7 @@ fun ConversationScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "翻译结果",
+                        text = stringResource(R.string.translation_result),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -170,7 +173,7 @@ fun ConversationScreen(
         ) {
             Icon(
                 if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
-                contentDescription = if (isListening) "停止" else "开始录音",
+                contentDescription = stringResource(if (isListening) R.string.stop_recording else R.string.start_recording),
                 modifier = Modifier.size(32.dp),
                 tint = MaterialTheme.colorScheme.onPrimary
             )
@@ -178,7 +181,7 @@ fun ConversationScreen(
 
         if (isListening) {
             Text(
-                text = "正在聆听...",
+                text = stringResource(R.string.listening),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )

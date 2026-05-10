@@ -8,7 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.translite.app.R
 import com.translite.app.domain.engine.TranslationEngine
 import com.translite.app.domain.model.Language
 import kotlinx.coroutines.launch
@@ -42,18 +44,18 @@ fun LanguagePackScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "语言包管理",
+                text = stringResource(R.string.language_pack_management),
                 style = MaterialTheme.typography.headlineMedium
             )
             Text(
-                text = "${languageStatus.values.count { it }}/${languageStatus.size} 已下载",
+                text = stringResource(R.string.download_count_format, languageStatus.values.count { it }, languageStatus.size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
         Text(
-            text = "首次翻译某语言时会自动下载语言包（约30-50MB）。",
+            text = stringResource(R.string.auto_download_hint),
             modifier = Modifier.padding(horizontal = 16.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline
@@ -107,8 +109,8 @@ fun LanguagePackScreen(
     showDeleteDialog?.let { lang ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            title = { Text("删除语言包") },
-            text = { Text("确定要删除 ${lang.displayName} 语言包吗？删除后需要重新下载才能离线翻译。") },
+            title = { Text(stringResource(R.string.delete_language_pack)) },
+            text = { Text(stringResource(R.string.confirm_delete_lang, lang.displayName)) },
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
@@ -118,10 +120,10 @@ fun LanguagePackScreen(
                         }
                     }
                     showDeleteDialog = null
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) { Text("取消") }
+                TextButton(onClick = { showDeleteDialog = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
     }
@@ -157,9 +159,9 @@ fun LanguagePackItem(
                 )
                 Text(
                     text = when {
-                        isDownloaded -> "已下载 ✓"
-                        isDownloading -> "下载中... ${(progress * 100).toInt()}%"
-                        else -> "未下载"
+                        isDownloaded -> stringResource(R.string.downloaded_checkmark)
+                        isDownloading -> stringResource(R.string.downloading_progress, (progress * 100).toInt())
+                        else -> stringResource(R.string.not_downloaded)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
@@ -181,7 +183,7 @@ fun LanguagePackItem(
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
-                        contentDescription = "删除",
+                        contentDescription = stringResource(R.string.delete),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -189,7 +191,7 @@ fun LanguagePackItem(
                 FilledTonalButton(onClick = onDownload) {
                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("下载")
+                    Text(stringResource(R.string.download))
                 }
             }
         }
